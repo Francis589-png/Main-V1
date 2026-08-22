@@ -1,0 +1,10 @@
+{
+  "name": "main-v1",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-config.mjs",
+    "check": "node --check app.js && node --check chat-service.js && node --check firebase.js && node --check scripts/build-config.mjs"
+  }
+}

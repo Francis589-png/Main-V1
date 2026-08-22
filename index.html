@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0d10" />
+  <meta name="description" content="Main — simple, modern communication." />
+  <title>Main — Connect simply</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand"><span class="brand-mark">M</span><span>Main</span></div>
+      <nav class="nav-list">
+        <button class="nav-item active" data-view="chats"><span>◉</span><span>Chats</span><b>3</b></button>
+        <button class="nav-item" data-view="updates"><span>◌</span><span>Updates</span></button>
+        <button class="nav-item" data-view="communities"><span>◎</span><span>Communities</span></button>
+        <button class="nav-item" data-view="calls"><span>⌁</span><span>Calls</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav-item" data-view="profile"><span>◯</span><span>Profile</span></button>
+        <button class="nav-item" id="themeButton"><span>☾</span><span>Appearance</span></button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Good evening</p>
+          <h1 id="viewTitle">Chats</h1>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" id="searchButton" aria-label="Search">⌕</button>
+          <button class="avatar avatar-small" id="profileButton" aria-label="Open profile">F</button>
+        </div>
+      </header>
+
+      <section class="content" id="content"></section>
+    </main>
+
+    <section class="conversation-panel" id="conversationPanel" aria-label="Conversation">
+      <div class="conversation-empty">
+        <div class="empty-orb">M</div>
+        <h2>Select a conversation</h2>
+        <p>Your messages will appear here. Pick a chat to continue.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="mobile-nav">
+    <button class="mobile-nav-item active" data-view="chats"><span>◉</span><small>Chats</small></button>
+    <button class="mobile-nav-item" data-view="updates"><span>◌</span><small>Updates</small></button>
+    <button class="mobile-nav-item" data-view="communities"><span>◎</span><small>Communities</small></button>
+    <button class="mobile-nav-item" data-view="calls"><span>⌁</span><small>Calls</small></button>
+    <button class="mobile-nav-item" data-view="profile"><span>◯</span><small>Profile</small></button>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>

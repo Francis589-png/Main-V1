@@ -10,14 +10,44 @@
         "createdAt": { ".validate": "newData.isNumber()" }
       }
     },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        "online": { ".validate": "newData.isBoolean()" },
+        "lastSeen": { ".validate": "newData.isNumber()" }
+      }
+    },
+    "typing": {
+      "$chatId": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isNumber() || !newData.exists()"
+        }
+      }
+    },
+    "userChats": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "messages": {
+      "$chatId": {
+        ".read": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).exists()",
+        "$messageId": {
+          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).exists() && (!data.exists() || data.child('senderId').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['senderId', 'createdAt', 'type']) && newData.child('senderId').val() === auth.uid && newData.child('createdAt').isNumber() && newData.child('type').isString()"
+        }
+      }
+    },
     "chats": {
       "$chatId": {
         ".read": "auth != null && data.child('members').child(auth.uid).exists()",
         ".write": "auth != null && (!data.exists() || data.child('members').child(auth.uid).exists())",
-        "messages": {
-          "$messageId": {
-            ".validate": "newData.hasChildren(['senderId', 'createdAt']) && newData.child('senderId').val() === auth.uid"
-          }
+        "members": {
+          "$uid": { ".validate": "newData.val() === true" }
         }
       }
     }

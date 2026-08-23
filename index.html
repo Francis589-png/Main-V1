@@ -39,6 +39,22 @@
     </div>
   </div>
 
+  <div id="verificationScreen" class="auth-screen" hidden>
+    <div class="auth-card verification-card">
+      <div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div>
+      <div class="verification-icon" aria-hidden="true">✉</div>
+      <p class="eyebrow">One quick step</p>
+      <h1>Verify your email</h1>
+      <p class="auth-subtitle">We sent a verification link to <strong id="verificationEmail">your email</strong>.</p>
+      <p class="verification-help">Open the email, tap the verification link, then come back here and confirm.</p>
+      <p id="verificationError" class="form-error" role="alert"></p>
+      <button class="primary-button" id="checkVerification" type="button">I've verified my email</button>
+      <button class="auth-switch" id="resendVerification" type="button">Resend verification email</button>
+      <button class="text-button" id="verificationLogout" type="button">Use a different account</button>
+      <p id="verificationStatus" class="auth-status" role="status"></p>
+    </div>
+  </div>
+
   <div id="app" class="app-shell" hidden>
     <aside class="sidebar" aria-label="Main navigation">
       <div class="brand"><span class="brand-mark">M</span><span>Main</span></div>

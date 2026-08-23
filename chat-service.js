@@ -30,6 +30,10 @@ export function watchUserChats(uid, callback) {
   return onValue(ref(db, `userChats/${uid}`), snapshot => callback(snapshot.val() || {}));
 }
 
+export function watchChat(chatId, callback) {
+  return onValue(ref(db, `chats/${chatId}`), snapshot => callback(snapshot.val() || null));
+}
+
 export function watchPublicProfiles(callback) {
   return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {}));
 }

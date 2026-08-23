@@ -5,17 +5,24 @@ export function conversationId(uidA, uidB) {
 }
 
 export async function ensureDirectChat(otherUser) {
-  if (!auth.currentUser || !otherUser?.uid) throw new Error('A signed-in user is required.');
+  if (!auth.currentUser || !otherUser?.uid || otherUser.uid === auth.currentUser.uid) throw new Error('A valid other user is required.');
   const myUid = auth.currentUser.uid;
   const chatId = conversationId(myUid, otherUser.uid);
-  const chat = {
+  await update(ref(db, `chats/${chatId}`), {
     type: 'direct',
     members: { [myUid]: true, [otherUser.uid]: true },
     updatedAt: serverTimestamp()
-  };
-  await update(ref(db, `chats/${chatId}`), chat);
-  await update(ref(db, `userChats/${myUid}/${chatId}`), { chatId, otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' });
-  await update(ref(db, `userChats/${otherUser.uid}/${chatId}`), { chatId, otherUid: myUid, otherName: auth.currentUser.displayName || 'Main user' });
+  });
+  await update(ref(db, `userChats/${myUid}/${chatId}`), {
+    chatId,
+    otherUid: otherUser.uid,
+    otherName: otherUser.displayName || 'Main user'
+  });
+  await update(ref(db, `userChats/${otherUser.uid}/${chatId}`), {
+    chatId,
+    otherUid: myUid,
+    otherName: auth.currentUser.displayName || 'Main user'
+  });
   return chatId;
 }
 
@@ -23,10 +30,16 @@ export function watchUserChats(uid, callback) {
   return onValue(ref(db, `userChats/${uid}`), snapshot => callback(snapshot.val() || {}));
 }
 
+export function watchPublicProfiles(callback) {
+  return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {}));
+}
+
 export function watchMessages(chatId, callback) {
   return onValue(ref(db, `messages/${chatId}`), snapshot => {
     const value = snapshot.val() || {};
-    callback(Object.entries(value).map(([id, message]) => ({ id, ...message })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+    callback(Object.entries(value)
+      .map(([id, message]) => ({ id, ...message }))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
   });
 }
 
@@ -52,7 +65,11 @@ export async function sendMessage(chatId, text) {
     serverCreatedAt: serverTimestamp(),
     readBy: { [auth.currentUser.uid]: true }
   });
-  await update(ref(db, `chats/${chatId}`), { lastMessage: cleanText, lastSenderId: auth.currentUser.uid, updatedAt: serverTimestamp() });
+  await update(ref(db, `chats/${chatId}`), {
+    lastMessage: cleanText,
+    lastSenderId: auth.currentUser.uid,
+    updatedAt: serverTimestamp()
+  });
 }
 
 export async function markRead(chatId, messageId) {
@@ -67,5 +84,8 @@ export async function markTyping(chatId, typing) {
 
 export async function updatePresence(online) {
   if (!auth.currentUser) return;
-  await update(ref(db, `presence/${auth.currentUser.uid}`), { online, lastSeen: Date.now() });
+  await update(ref(db, `presence/${auth.currentUser.uid}`), {
+    online,
+    lastSeen: Date.now()
+  });
 }

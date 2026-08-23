@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js';
@@ -19,7 +20,6 @@ import {
 import { firebaseConfig } from './firebase-config.js';
 
 const configured = Object.values(firebaseConfig).every(value => value && !String(value).startsWith('YOUR_'));
-
 let app = null;
 let auth = null;
 let db = null;
@@ -37,6 +37,7 @@ export {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signOut,
   updateProfile,
   ref,

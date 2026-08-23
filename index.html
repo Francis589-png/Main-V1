@@ -1,83 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#f7f8fc" />
-  <meta name="description" content="Main — private messaging." />
-  <title>Main — Private messaging</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <div id="authScreen" class="auth-screen" hidden>
-    <div class="auth-card">
-      <div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div>
-      <p class="eyebrow">PRIVATE MESSAGING</p>
-      <h1 id="authTitle">Welcome back</h1>
-      <p id="authSubtitle" class="auth-subtitle">Sign in to continue.</p>
-      <form id="authForm" novalidate>
-        <div id="nameField" class="field" hidden><label for="nameInput">Name</label><input id="nameInput" autocomplete="name" placeholder="Your name" /></div>
-        <div class="field"><label for="emailInput">Email</label><input id="emailInput" type="email" autocomplete="email" required placeholder="you@example.com" /></div>
-        <div class="field"><label for="passwordInput">Password</label><input id="passwordInput" type="password" minlength="6" autocomplete="current-password" required placeholder="At least 6 characters" /></div>
-        <p id="authError" class="form-error" role="alert"></p>
-        <button class="primary-button" type="submit" id="authSubmit">Sign in</button>
-      </form>
-      <button class="auth-switch" id="authSwitch" type="button">Create an account</button>
-      <p id="firebaseStatus" class="auth-status">Checking connection…</p>
-    </div>
-  </div>
-
-  <div id="verificationScreen" class="auth-screen" hidden>
-    <div class="auth-card verification-card">
-      <div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div>
-      <div class="verification-icon" aria-hidden="true">✉</div>
-      <p class="eyebrow">EMAIL VERIFICATION</p>
-      <h1>Verify your email</h1>
-      <p class="auth-subtitle">We sent a verification link to <strong id="verificationEmail">your email</strong>.</p>
-      <p class="verification-help">Open the message, tap the link, then return to Main.</p>
-      <p id="verificationError" class="form-error" role="alert"></p>
-      <button class="primary-button" id="checkVerification" type="button">I've verified my email</button>
-      <button class="auth-switch" id="resendVerification" type="button">Resend verification email</button>
-      <button class="text-button" id="verificationLogout" type="button">Use a different account</button>
-      <p id="verificationStatus" class="auth-status" role="status"></p>
-    </div>
-  </div>
-
-  <div id="app" class="app-shell" hidden>
-    <aside class="sidebar" aria-label="Main navigation">
-      <div class="brand"><span class="brand-mark">M</span><span>Main</span></div>
-      <nav class="nav-list">
-        <button class="nav-item active" data-view="chats"><span>◉</span><span>Chats</span></button>
-      </nav>
-      <div class="sidebar-bottom">
-        <button class="nav-item" data-view="profile"><span>◯</span><span>Profile</span></button>
-        <button class="nav-item" id="themeButton"><span>☾</span><span>Appearance</span></button>
-        <button class="nav-item" id="logoutButton"><span>↪</span><span>Log out</span></button>
-      </div>
-    </aside>
-
-    <main class="main-panel">
-      <header class="topbar">
-        <div><p class="eyebrow">MAIN</p><h1 id="viewTitle">Chats</h1></div>
-        <div class="top-actions"><button class="icon-button" id="searchButton" aria-label="Search conversations">⌕</button><button class="avatar avatar-small" id="profileButton" aria-label="Open profile">M</button></div>
-      </header>
-      <section class="content" id="content"></section>
-    </main>
-
-    <section class="conversation-panel" id="conversationPanel" aria-label="Conversation">
-      <div class="conversation-empty"><div class="empty-orb">M</div><h2>Your conversations</h2><p>Select a person to start a private conversation.</p></div>
-    </section>
-  </div>
-
-  <div class="mobile-nav" id="mobileNav">
-    <button class="mobile-nav-item active" data-view="chats"><span>◉</span><small>Chats</small></button>
-    <button class="mobile-nav-item" data-view="profile"><span>◯</span><small>Profile</small></button>
-  </div>
-
-  <div class="toast" id="toast" role="status"></div>
-  <script type="module" src="app.js"></script>
-</body>
-</html>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="theme-color" content="#f7f8fc" /><meta name="description" content="Main — private messaging." /><title>Main — Private messaging</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><link rel="stylesheet" href="styles.css" />
+</head><body>
+<div id="authScreen" class="auth-screen" hidden><div class="auth-card"><div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div><p class="eyebrow">PRIVATE MESSAGING</p><h1 id="authTitle">Welcome back</h1><p id="authSubtitle" class="auth-subtitle">Sign in to continue.</p><form id="authForm" novalidate><div id="nameField" class="field" hidden><label for="nameInput">Name</label><input id="nameInput" autocomplete="name" placeholder="Your name" /></div><div class="field"><label for="emailInput">Email</label><input id="emailInput" type="email" autocomplete="email" required placeholder="you@example.com" /></div><div class="field"><label for="passwordInput">Password</label><input id="passwordInput" type="password" minlength="6" autocomplete="current-password" required placeholder="At least 6 characters" /></div><p id="authError" class="form-error" role="alert"></p><button class="primary-button" type="submit" id="authSubmit">Sign in</button></form><button class="auth-switch" id="authSwitch" type="button">Create an account</button><p id="firebaseStatus" class="auth-status">Checking connection…</p></div></div>
+<div id="verificationScreen" class="auth-screen" hidden><div class="auth-card verification-card"><div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div><div class="verification-icon" aria-hidden="true">✉</div><p class="eyebrow">EMAIL VERIFICATION</p><h1>Verify your email</h1><p class="auth-subtitle">We sent a verification link to <strong id="verificationEmail">your email</strong>.</p><p class="verification-help">Open the message, tap the link, then return to Main.</p><p id="verificationError" class="form-error" role="alert"></p><button class="primary-button" id="checkVerification" type="button">I've verified my email</button><button class="auth-switch" id="resendVerification" type="button">Resend verification email</button><button class="text-button" id="verificationLogout" type="button">Use a different account</button><p id="verificationStatus" class="auth-status" role="status"></p></div></div>
+<div id="app" class="app-shell" hidden><aside class="sidebar" aria-label="Main navigation"><div class="brand"><span class="brand-mark">M</span><span>Main</span></div><nav class="nav-list"><button class="nav-item active" data-view="chats"><span>◉</span><span>Chats</span></button></nav><div class="sidebar-bottom"><button class="nav-item" data-view="profile"><span>◯</span><span>Profile</span></button><button class="nav-item" id="themeButton"><span>☾</span><span>Appearance</span></button><button class="nav-item" id="logoutButton"><span>↪</span><span>Log out</span></button></div></aside><main class="main-panel"><header class="topbar"><div><p class="eyebrow">MAIN</p><h1 id="viewTitle">Chats</h1></div><div class="top-actions"><button class="icon-button" id="searchButton" aria-label="Search conversations">⌕</button><button class="avatar avatar-small" id="profileButton" aria-label="Open profile">M</button></div></header><section class="content" id="content"></section></main><section class="conversation-panel" id="conversationPanel" aria-label="Conversation"><div class="conversation-empty"><div class="empty-orb">M</div><h2>Your conversations</h2><p>Select a person to start a private conversation.</p></div></section></div>
+<div class="mobile-nav" id="mobileNav"><button class="mobile-nav-item active" data-view="chats"><span>◉</span><small>Chats</small></button><button class="mobile-nav-item" data-view="profile"><span>◯</span><small>Profile</small></button></div><div class="toast" id="toast" role="status"></div><script type="module" src="app.js"></script>
+</body></html>

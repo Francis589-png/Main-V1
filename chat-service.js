@@ -30,7 +30,7 @@ export function watchChat(chatId,callback){return onValue(ref(db,`chats/${chatId
 export function watchPublicProfiles(callback){return onValue(ref(db,'publicProfiles'),s=>callback(s.val()||{}));}
 export function watchMessages(chatId,callback){return onValue(ref(db,`messages/${chatId}`),s=>{const v=s.val()||{};callback(Object.entries(v).map(([id,message])=>({id,...message})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)));});}
 export function watchPresence(uid,callback){return onValue(ref(db,`presence/${uid}`),s=>callback(s.val()||{online:false}));}
-export function watchTyping(chatId,otherUid,callback){return onValue(ref(db,`typing/${chatId}/${otherUid}`),s=>callback(Boolean(s.val())));}
+export function watchTyping(chatId,otherUid,callback){return onValue(ref(db,`typing/${chatId}/${otherUid}`),s=>callback(Boolean(s.val()));}
 
 export async function sendMessage(chatId,text){
   if(!auth.currentUser) throw new Error('You must be signed in.');
@@ -43,7 +43,8 @@ export async function sendMessage(chatId,text){
   if(chat.type==='group'){
     for(const uid of Object.keys(chat.members)) writes[`userChats/${uid}/${chatId}`]={chatId,type:'group',groupName:chat.name,otherName:chat.name,lastMessage:cleanText,lastSenderId:auth.currentUser.uid,updatedAt:createdAt,unreadCount:uid===auth.currentUser.uid?0:(Number(((await get(ref(db,`userChats/${uid}/${chatId}/unreadCount`))).val()))||0)+1};
   }else{
-    const otherUid=recipientIds[0],profile=(await get(ref(db,`publicProfiles/${otherUid}`))).val()||{});
+    const otherUid=recipientIds[0];
+    const profile=(await get(ref(db,`publicProfiles/${otherUid}`))).val()||{};
     writes[`userChats/${auth.currentUser.uid}/${chatId}`]={chatId,otherUid,otherName:profile.displayName||'Main user',lastMessage:cleanText,lastSenderId:auth.currentUser.uid,updatedAt:createdAt,unreadCount:0};
     writes[`userChats/${otherUid}/${chatId}`]={chatId,otherUid:auth.currentUser.uid,otherName:auth.currentUser.displayName||'Main user',lastMessage:cleanText,lastSenderId:auth.currentUser.uid,updatedAt:createdAt,unreadCount:(Number(((await get(ref(db,`userChats/${otherUid}/${chatId}/unreadCount`))).val()))||0)+1};
   }
@@ -51,6 +52,5 @@ export async function sendMessage(chatId,text){
 }
 export async function markRead(chatId,messageId){if(!auth.currentUser||!messageId)return;const uid=auth.currentUser.uid;await update(ref(db,`messages/${chatId}/${messageId}/readBy`),{[uid]:true});await update(ref(db,`userChats/${uid}/${chatId}`),{unreadCount:0});}
 
-// Typing is intentionally lightweight: one realtime write on each state transition, not every keystroke.
 export async function markTyping(chatId,typing){if(!auth.currentUser)return;await set(ref(db,`typing/${chatId}/${auth.currentUser.uid}`),typing?Date.now():null);}
 export async function updatePresence(online){if(!auth.currentUser)return;await update(ref(db,`presence/${auth.currentUser.uid}`),{online,lastSeen:Date.now()});}

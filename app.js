@@ -1,4 +1,4 @@
-import { configured, auth, db, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, ref, set, serverTimestamp } from './firebase.js';
+import { configured, auth, db, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, ref, set, onValue, serverTimestamp } from './firebase.js';
 import { sendMessage, ensureDirectChat, watchUserChats, watchPublicProfiles, watchMessages, watchPresence, watchTyping, updatePresence, markTyping, markRead, conversationId } from './chat-service.js';
 
 const $=id=>document.getElementById(id), content=$('content'), viewTitle=$('viewTitle'), panel=$('conversationPanel'), toast=$('toast'), authScreen=$('authScreen'), app=$('app'), mobileNav=$('mobileNav');

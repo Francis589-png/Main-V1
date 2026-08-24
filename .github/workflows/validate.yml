@@ -15,4 +15,11 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
-        run: node --check app.js && node --check firebase.js
+        run: |
+          for file in app.js firebase.js chat-service.js; do
+            if [ -f "$file" ]; then
+              echo "Checking $file..."
+              node --check "$file" || exit 1
+            fi
+          done
+          echo "✓ All JavaScript files are syntactically valid"

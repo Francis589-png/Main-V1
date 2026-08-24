@@ -66,6 +66,8 @@ export async function sendMessage(chatId, text) {
   const otherUid = Object.keys(chat.members).find(uid => uid !== auth.currentUser.uid);
   if (!otherUid) throw new Error('This conversation does not have another member.');
 
+  const recipientProfileSnapshot = await get(ref(db, `publicProfiles/${otherUid}`));
+  const recipientProfile = recipientProfileSnapshot.val() || {};
   const messageRef = push(ref(db, `messages/${chatId}`));
   const createdAt = Date.now();
   const message = {
@@ -77,10 +79,10 @@ export async function sendMessage(chatId, text) {
     readBy: { [auth.currentUser.uid]: true }
   };
 
-  const chatPreview = {
+  const senderPreview = {
     chatId,
     otherUid,
-    otherName: chat.members[otherUid]?.displayName || undefined,
+    otherName: recipientProfile.displayName || 'Main user',
     lastMessage: cleanText,
     lastSenderId: auth.currentUser.uid,
     updatedAt: createdAt,
@@ -100,7 +102,7 @@ export async function sendMessage(chatId, text) {
   writes[`chats/${chatId}/lastMessage`] = cleanText;
   writes[`chats/${chatId}/lastSenderId`] = auth.currentUser.uid;
   writes[`chats/${chatId}/updatedAt`] = serverTimestamp();
-  writes[`userChats/${auth.currentUser.uid}/${chatId}`] = chatPreview;
+  writes[`userChats/${auth.currentUser.uid}/${chatId}`] = senderPreview;
   writes[`userChats/${otherUid}/${chatId}`] = recipientPreview;
   await update(ref(db), writes);
 }

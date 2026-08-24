@@ -27,16 +27,13 @@ function navigate(v){document.querySelectorAll('[data-view]').forEach(i=>i.class
 document.querySelectorAll('[data-view]').forEach(i=>i.onclick=()=>navigate(i.dataset.view));const doSearch=()=>{navigate('chats');setTimeout(()=>$('chatSearch')?.focus(),0)};$('searchButton').onclick=doSearch;
 
 // Render functions for lists and interactions (kept mostly as in original file but with corrected template spacing)
-function renderChatsList(chats){const list=$('chatList');list.innerHTML='';stopChats=watchUserChats(auth.currentUser.uid,chats={entries:Object.values(chats).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))},draw=q=>{const items=q.entries.filter(c=>`${c.otherName||''} ${c.lastMessage||''}`.toLowerCase().includes(q.toLowerCase()));list.innerHTML=items.length?items.map(c=>`<button class="chat-card" data-chat="${esc(c.chatId)}"><span class="chat-avatar">${esc((c.otherName||'M').charAt(0)).toUpperCase()}</span><span class="chat-main"><span class="chat-name">${esc(c.otherName||'Main user')}</span><span class="chat-preview">${esc(c.lastMessage||'No messages yet')}</span></span><span class="chat-meta">${timeAgo(c.updatedAt)}</span></button>`).join(''):'<div class="empty-state"><strong>Loading your conversations…</strong><span>Connecting to Main.</span></div>'});
+function renderChatsList(chats){const list=$('chatList');list.innerHTML='';stopChats=watchUserChats(auth.currentUser.uid,chats={entries:Object.values(chats).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))},draw=q=>{const items=q.entries.filter(c=>`${c.otherName||''} ${c.lastMessage||''}`.toLowerCase().includes(q.toLowerCase()));list.innerHTML=items.length?items.map(c=>`<button class=\"chat-card\" data-chat=\"${esc(c.chatId)}\"><span class=\"chat-avatar\">${esc((c.otherName||'M').charAt(0)).toUpperCase()}</span><span class=\"chat-main\"><span class=\"chat-name\">${esc(c.otherName||'Main user')}</span><span class=\"chat-preview\">${esc(c.lastMessage||'No messages yet')}</span></span><span class=\"chat-meta\">${timeAgo(c.updatedAt)}</span></button>`).join(''):'<div class=\"empty-state\"><strong>Loading your conversations…</strong><span>Connecting to Main.</span></div>'});
 }
 
 function renderExploreList(profiles){const list=$('exploreList');list.innerHTML='';const listItems=Object.values(profiles);stopProfiles=watchPublicProfiles(v=>{profiles=v||{};renderExploreList()});
 }
 
-// Simplified rendering and event wiring for the rest of the UI — corrected template expressions
-function renderExplore(){cleanup();document.body.classList.remove('chat-open');viewTitle.textContent='Explore people';content.innerHTML='<button class="back-link" id="backToChats" type="button">← Back</button><div id="exploreList"></div>'}
-
-// (Other UI wiring functions follow; ensure all `${` sequences are contiguous without spaces)
+function renderExploreItems(profiles){const list=$('exploreList');const items=Object.values(profiles||{});list.innerHTML=items.map(u=>`<button class="profile-card" data-uid="${esc(u.uid)}"><div class="profile-avatar">${esc((u.displayName||'M').charAt(0)).toUpperCase()}</div><div class="profile-info"><strong>${esc(u.displayName||u.email||'Main user')}</strong><span class="profile-meta">${esc(u.mood||'')}</span></div></button>`).join('')}
 
 // Initialize app
 onAuthStateChanged(auth,user=>{if(user){showApp(user);stopChats=watchUserChats(user.uid).catch(()=>{});stopProfiles=watchPublicProfiles().catch(()=>{});}else{showAuth()}});

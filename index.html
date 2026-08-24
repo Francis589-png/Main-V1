@@ -3,8 +3,35 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#ffffff"><meta name="description" content="Main — private messaging"><title>Main</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="ui-overrides.css">
-</head><body>
-<div id="authScreen" class="auth-screen" hidden><div class="auth-card"><div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div><p class="eyebrow">PRIVATE MESSAGING</p><h1 id="authTitle">Welcome back</h1><p id="authSubtitle" class="auth-subtitle">Sign in to continue.</p><form id="authForm" novalidate><div id="nameField" class="field" hidden><label for="nameInput">Name</label><input id="nameInput" autocomplete="name" placeholder="Your name"></div><div class="field"><label for="emailInput">Email</label><input id="emailInput" type="email" autocomplete="email" required placeholder="you@example.com"></div><div class="field"><label for="passwordInput">Password</label><input id="passwordInput" type="password" minlength="6" autocomplete="current-password" required placeholder="At least 6 characters"></div><p id="authError" class="form-error" role="alert"></p><button class="primary-button" type="submit" id="authSubmit">Sign in</button></form><button class="auth-switch" id="authSwitch" type="button">Create an account</button><p id="firebaseStatus" class="auth-status">Checking connection…</p></div></div>
-<div id="verificationScreen" hidden></div>
-<div id="app" class="app-shell" hidden><header class="mobile-topbar"><div class="brand"><span class="brand-mark">M</span><span>Main</span></div><div class="top-actions"><button class="icon-button" id="searchButton" aria-label="Search">⌕</button></div></header><main class="main-panel"><header class="topbar desktop-topbar"><div><h1 id="viewTitle">Chats</h1></div><div class="top-actions"><button class="icon-button" id="desktopSearchButton" aria-label="Search">⌕</button><button class="avatar avatar-small" id="profileButton" aria-label="Profile">M</button></div></header><section class="content" id="content"></section></main><section class="conversation-panel" id="conversationPanel" aria-label="Conversation"><div class="conversation-empty"><div class="empty-orb">M</div><h2>Your conversations</h2><p>Select a conversation to start messaging.</p></div></section><nav class="mobile-nav" id="mobileNav" aria-label="Main navigation"><button class="mobile-nav-item active" data-view="chats"><span>◉</span><small>Chats</small></button><button class="mobile-nav-item" data-view="mood"><span>◌</span><small>Mood</small></button><button class="mobile-nav-item" data-view="profile"><span>◯</span><small>Settings</small></button></nav></div><div class="toast" id="toast" role="status"></div><script type="module" src="app.js"></script>
-</body></html>
+</head>
+<body>
+<div id="authScreen" class="auth-screen" hidden>
+  <div class="auth-card">
+    <div class="brand auth-brand"><span class="brand-mark">M</span><span>Main</span></div>
+    <p class="eyebrow">PRIVATE MESSAGING</p>
+    <h1 id="authTitle">Welcome back</h1>
+    <p id="authSubtitle" class="auth-subtitle">Sign in to continue.</p>
+    <form id="authForm" novalidate>
+      <div id="nameField" class="field" hidden><label for="nameInput">Name</label><input id="nameInput" autocomplete="name" placeholder="Your name"></div>
+      <div class="field"><label for="emailInput">Email</label><input id="emailInput" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+      <div class="field"><label for="passwordInput">Password</label><input id="passwordInput" type="password" minlength="6" autocomplete="current-password" required placeholder="At least 6 characters"></div>
+      <p id="authError" class="form-error" role="alert"></p>
+      <button class="primary-button" type="submit" id="authSubmit">Sign in</button>
+    </form>
+    <button class="auth-switch" id="authSwitch" type="button">Create an account</button>
+    <p id="firebaseStatus" class="auth-status">Checking connection…</p>
+  </div>
+</div>
+<div id="app" class="app-shell" hidden>
+  <header class="mobile-topbar"><div class="brand"><span class="brand-mark">M</span><span>Main</span></div><div class="top-actions"><button class="icon-button" id="searchButton" aria-label="Search">⌕</button></div></header>
+  <main class="main-panel">
+    <header class="topbar desktop-topbar"><div><h1 id="viewTitle">Chats</h1></div><div class="top-actions"><button class="icon-button" id="desktopSearchButton" aria-label="Search">⌕</button><button class="avatar avatar-small" id="profileButton" aria-label="Profile">M</button></div></header>
+    <section class="content" id="content"></section>
+  </main>
+  <section class="conversation-panel" id="conversationPanel" aria-label="Conversation"><div class="conversation-empty"><div class="empty-orb">M</div><h2>Your conversations</h2><p>Select a conversation to start messaging.</p></div></section>
+  <nav class="mobile-nav" id="mobileNav" aria-label="Main navigation"><button class="mobile-nav-item active" data-view="chats"><span>◉</span><small>Chats</small></button><button class="mobile-nav-item" data-view="mood"><span>◌</span><small>Mood</small></button><button class="mobile-nav-item" data-view="profile"><span>◯</span><small>Settings</small></button></nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

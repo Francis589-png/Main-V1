@@ -1,4 +1,4 @@
-import { db, auth, onValue, push, ref, serverTimestamp, set, update } from './firebase.js';
+import { db, auth, get, onValue, push, ref, serverTimestamp, set, update } from './firebase.js';
 
 export function conversationId(uidA, uidB) {
   return [uidA, uidB].sort().join('_');
@@ -59,26 +59,57 @@ export async function sendMessage(chatId, text) {
   if (!auth.currentUser) throw new Error('You must be signed in.');
   const cleanText = text.trim();
   if (!cleanText) return;
+
+  const chatSnapshot = await get(ref(db, `chats/${chatId}`));
+  const chat = chatSnapshot.val();
+  if (!chat?.members?.[auth.currentUser.uid]) throw new Error('You are not a member of this conversation.');
+  const otherUid = Object.keys(chat.members).find(uid => uid !== auth.currentUser.uid);
+  if (!otherUid) throw new Error('This conversation does not have another member.');
+
   const messageRef = push(ref(db, `messages/${chatId}`));
   const createdAt = Date.now();
-  await set(messageRef, {
+  const message = {
     senderId: auth.currentUser.uid,
     text: cleanText,
     type: 'text',
     createdAt,
     serverCreatedAt: serverTimestamp(),
     readBy: { [auth.currentUser.uid]: true }
-  });
-  await update(ref(db, `chats/${chatId}`), {
+  };
+
+  const chatPreview = {
+    chatId,
+    otherUid,
+    otherName: chat.members[otherUid]?.displayName || undefined,
     lastMessage: cleanText,
     lastSenderId: auth.currentUser.uid,
-    updatedAt: serverTimestamp()
-  });
+    updatedAt: createdAt,
+    unreadCount: 0
+  };
+  const recipientPreview = {
+    chatId,
+    otherUid: auth.currentUser.uid,
+    otherName: auth.currentUser.displayName || 'Main user',
+    lastMessage: cleanText,
+    lastSenderId: auth.currentUser.uid,
+    updatedAt: createdAt
+  };
+
+  const writes = {};
+  writes[`messages/${chatId}/${messageRef.key}`] = message;
+  writes[`chats/${chatId}/lastMessage`] = cleanText;
+  writes[`chats/${chatId}/lastSenderId`] = auth.currentUser.uid;
+  writes[`chats/${chatId}/updatedAt`] = serverTimestamp();
+  writes[`userChats/${auth.currentUser.uid}/${chatId}`] = chatPreview;
+  writes[`userChats/${otherUid}/${chatId}`] = recipientPreview;
+  await update(ref(db), writes);
 }
 
 export async function markRead(chatId, messageId) {
   if (!auth.currentUser || !messageId) return;
-  await update(ref(db, `messages/${chatId}/${messageId}/readBy`), { [auth.currentUser.uid]: true });
+  const uid = auth.currentUser.uid;
+  await update(ref(db, `messages/${chatId}/${messageId}/readBy`), { [uid]: true });
+  await update(ref(db, `userChats/${uid}/${chatId}`), { unreadCount: 0 });
 }
 
 export async function markTyping(chatId, typing) {

@@ -15,6 +15,9 @@ service cloud.firestore {
       allow update: if isSelf(uid) && request.resource.data.uid == resource.data.uid;
       allow delete: if false;
     }
+    match /users/{uid}/pushTokens/{token} {
+      allow read, create, update, delete: if isSelf(uid);
+    }
     match /usernames/{username} {
       allow read: if signedIn();
       allow create: if isSelf(request.resource.data.uid);

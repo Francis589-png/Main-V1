@@ -26,6 +26,10 @@ service cloud.firestore {
       return isMember(conversationId) && memberRole(conversationId, request.auth.uid) in ['owner', 'admin'];
     }
 
+    function onlyOwnMapKey(field) {
+      return request.resource.data[field].diff(resource.data[field]).affectedKeys().hasOnly([request.auth.uid]);
+    }
+
     match /users/{uid} {
       allow read: if signedIn();
       allow create: if isSelf(uid) && request.resource.data.uid == uid;
@@ -35,9 +39,18 @@ service cloud.firestore {
 
     match /usernames/{username} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow create: if isSelf(request.resource.data.uid);
       allow update: if false;
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /userConversations/{uid}/items/{conversationId} {
+      allow get, list: if isSelf(uid) && request.query.limit <= 50;
+      allow create: if isSelf(uid) && request.resource.data.chatId == conversationId;
+      allow update: if isSelf(uid)
+        && request.resource.data.chatId == resource.data.chatId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadCount']);
+      allow delete: if isSelf(uid);
     }
 
     match /conversations/{conversationId} {
@@ -48,7 +61,7 @@ service cloud.firestore {
       allow update: if isMember(conversationId)
         && (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'lastMessage', 'lastMessageAt', 'lastSenderId', 'updatedAt', 'pinnedBy', 'mutedBy'
+            'lastMessage', 'lastMessageAt', 'lastSenderId', 'updatedAt', 'name', 'photoCID', 'pinnedBy', 'mutedBy'
           ])
           || isAdmin(conversationId)
         );
@@ -74,8 +87,19 @@ service cloud.firestore {
           && request.resource.data.createdAt is timestamp;
         allow update: if isMember(conversationId) && (
           (resource.data.senderId == request.auth.uid
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['editedAt', 'text', 'deletedAt']))
-          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredTo', 'readBy', 'reactions'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['editedAt', 'text', 'deletedAt', 'replyTo']))
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredAt'])
+            && onlyOwnMapKey('deliveredAt')
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+            && onlyOwnMapKey('readBy')
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            && request.resource.data.reactions[request.auth.uid] is string
+          )
         );
         allow delete: if isMember(conversationId)
           && (resource.data.senderId == request.auth.uid || isAdmin(conversationId));

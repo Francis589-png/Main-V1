@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function memberPath(conversationId, uid) {
+      return /databases/$(database)/documents/conversations/$(conversationId)/members/$(uid);
+    }
+
+    function isMember(conversationId) {
+      return signedIn() && exists(memberPath(conversationId, request.auth.uid));
+    }
+
+    function memberRole(conversationId, uid) {
+      return get(memberPath(conversationId, uid)).data.role;
+    }
+
+    function isAdmin(conversationId) {
+      return isMember(conversationId) && memberRole(conversationId, request.auth.uid) in ['owner', 'admin'];
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid) && request.resource.data.uid == uid;
+      allow update: if isSelf(uid) && request.resource.data.uid == resource.data.uid;
+      allow delete: if false;
+    }
+
+    match /usernames/{username} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /conversations/{conversationId} {
+      allow create: if signedIn()
+        && request.resource.data.type in ['direct', 'group']
+        && request.resource.data.createdBy == request.auth.uid;
+      allow read: if isMember(conversationId);
+      allow update: if isMember(conversationId)
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessage', 'lastMessageAt', 'lastSenderId', 'updatedAt', 'pinnedBy', 'mutedBy'
+          ])
+          || isAdmin(conversationId)
+        );
+      allow delete: if isAdmin(conversationId);
+
+      match /members/{uid} {
+        allow read: if isMember(conversationId);
+        allow create: if signedIn() && (
+          (uid == request.auth.uid && !exists(memberPath(conversationId, uid)))
+          || isAdmin(conversationId)
+        );
+        allow update: if isAdmin(conversationId)
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.role in ['owner', 'admin', 'member'];
+        allow delete: if isSelf(uid) || isAdmin(conversationId);
+      }
+
+      match /messages/{messageId} {
+        allow read: if isMember(conversationId);
+        allow create: if isMember(conversationId)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.type in ['text', 'image', 'video', 'audio', 'document', 'voice']
+          && request.resource.data.createdAt is timestamp;
+        allow update: if isMember(conversationId) && (
+          (resource.data.senderId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['editedAt', 'text', 'deletedAt']))
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredTo', 'readBy', 'reactions'])
+        );
+        allow delete: if isMember(conversationId)
+          && (resource.data.senderId == request.auth.uid || isAdmin(conversationId));
+      }
+    }
+
+    match /media/{mediaId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /notifications/{uid}/items/{notificationId} {
+      allow read, update, delete: if isSelf(uid);
+      allow create: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

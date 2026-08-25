@@ -1,18 +1,9 @@
 import { auth, firestore, collection, query, orderBy, limit, onSnapshot, doc, updateDoc } from './firebase.js';
-
-let stop = null;
-let initialized = false;
+let stop = null; let initialized = false; let latest = [];
 const toast = message => { const el = document.getElementById('toast'); if (!el) return; el.textContent = message; el.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 2800); };
-function installButton() {
-  if (document.getElementById('notificationButton')) return;
-  const target = document.querySelector('.desktop-topbar .top-actions, .mobile-topbar .top-actions'); if (!target) return;
-  const button = document.createElement('button'); button.id = 'notificationButton'; button.className = 'icon-button'; button.type = 'button'; button.setAttribute('aria-label', 'Notifications'); button.textContent = '♢'; button.onclick = () => document.getElementById('notificationPanel')?.remove();
-  target.prepend(button);
-}
-function watch() {
-  if (!auth?.currentUser || !firestore || initialized) return; initialized = true;
-  stop?.(); const q = query(collection(firestore, 'notifications', auth.currentUser.uid, 'items'), orderBy('createdAt', 'desc'), limit(20)); let first = true;
-  stop = onSnapshot(q, snapshot => { const unread = snapshot.docs.filter(item => item.data().read === false); const button = document.getElementById('notificationButton'); if (button) button.textContent = unread.length ? `♢ ${unread.length}` : '♢'; if (!first && unread[0]) toast(unread[0].data().groupName ? `${unread[0].data().groupName}: ${unread[0].data().text}` : unread[0].data().text); first = false; }, () => {});
-}
+function styles() { if (document.getElementById('notificationStyles')) return; const style = document.createElement('style'); style.id = 'notificationStyles'; style.textContent = `.notification-panel{position:fixed;top:64px;right:14px;width:min(360px,calc(100vw - 28px));max-height:70vh;overflow:auto;background:var(--panel,#fff);border-radius:16px;padding:10px;box-shadow:0 18px 60px rgba(0,0,0,.2);z-index:9998}.notification-item{display:block;width:100%;text-align:left;border:0;background:transparent;padding:11px;border-radius:10px;cursor:pointer}.notification-item:hover{background:rgba(127,127,127,.1)}.notification-unread{font-weight:700}`; document.head.appendChild(style); }
+function renderPanel() { document.getElementById('notificationPanel')?.remove(); const panel = document.createElement('div'); panel.id = 'notificationPanel'; panel.className = 'notification-panel'; panel.innerHTML = '<strong>Notifications</strong>'; if (!latest.length) panel.insertAdjacentHTML('beforeend', '<div style="padding:18px;text-align:center;opacity:.7">No notifications</div>'); latest.forEach(item => { const data = item.data(); const button = document.createElement('button'); button.className = `notification-item ${data.read === false ? 'notification-unread' : ''}`; button.type = 'button'; button.textContent = `${data.groupName ? `${data.groupName}: ` : ''}${data.text || 'New message'}`; button.onclick = async () => { try { await updateDoc(doc(firestore, 'notifications', auth.currentUser.uid, 'items', item.id), { read: true }); } catch {} panel.remove(); }; panel.appendChild(button); }); document.body.appendChild(panel); }
+function installButton() { if (document.getElementById('notificationButton')) return; const target = document.querySelector('.desktop-topbar .top-actions, .mobile-topbar .top-actions'); if (!target) return; styles(); const button = document.createElement('button'); button.id = 'notificationButton'; button.className = 'icon-button'; button.type = 'button'; button.setAttribute('aria-label', 'Notifications'); button.textContent = '♢'; button.onclick = renderPanel; target.prepend(button); }
+function watch() { if (!auth?.currentUser || !firestore || initialized) return; initialized = true; stop?.(); const q = query(collection(firestore, 'notifications', auth.currentUser.uid, 'items'), orderBy('createdAt', 'desc'), limit(20)); let first = true; stop = onSnapshot(q, snapshot => { latest = snapshot.docs; const unread = latest.filter(item => item.data().read === false); const button = document.getElementById('notificationButton'); if (button) button.textContent = unread.length ? `♢ ${unread.length}` : '♢'; if (!first && unread[0]) toast(unread[0].data().groupName ? `${unread[0].data().groupName}: ${unread[0].data().text}` : unread[0].data().text); first = false; }, () => {}); }
 new MutationObserver(installButton).observe(document.body, { childList: true, subtree: true });
 if (auth) auth.onAuthStateChanged?.(user => { if (user) { initialized = false; watch(); } else { stop?.(); stop = null; initialized = false; } });

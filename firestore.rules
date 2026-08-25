@@ -45,7 +45,8 @@ service cloud.firestore {
     }
 
     match /userConversations/{uid}/items/{conversationId} {
-      allow get, list: if isSelf(uid) && request.query.limit <= 50;
+      allow get: if isSelf(uid);
+      allow list: if isSelf(uid) && request.query.limit <= 50;
       allow create: if isSelf(uid) && request.resource.data.chatId == conversationId;
       allow update: if isSelf(uid)
         && request.resource.data.chatId == resource.data.chatId

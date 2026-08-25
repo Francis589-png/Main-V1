@@ -1,8 +1,9 @@
 import { auth } from './firebase.js';
+import { firebaseConfig } from './firebase-config.js';
 
-const DEFAULT_FUNCTION_URL = 'https://us-central1-main-v1.cloudfunctions.net/uploadMedia';
+const functionUrl = () => `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/uploadMedia`;
 
-export async function uploadMedia(file, metadata = {}, endpoint = DEFAULT_FUNCTION_URL) {
+export async function uploadMedia(file, metadata = {}, endpoint = functionUrl()) {
   if (!auth?.currentUser) throw new Error('You must be signed in to upload media.');
   if (!(file instanceof File)) throw new Error('Invalid file.');
   const token = await auth.currentUser.getIdToken();

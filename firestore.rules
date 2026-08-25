@@ -10,13 +10,18 @@ service cloud.firestore {
     function onlyOwnMapKey(field) { return request.resource.data[field].diff(resource.data[field]).affectedKeys().hasOnly([request.auth.uid]); }
 
     match /users/{uid} {
-      allow read: if signedIn();
+      allow get: if isSelf(uid);
+      allow list: if false;
       allow create: if isSelf(uid) && request.resource.data.uid == uid;
       allow update: if isSelf(uid) && request.resource.data.uid == resource.data.uid;
       allow delete: if false;
     }
-    match /users/{uid}/pushTokens/{token} {
-      allow read, create, update, delete: if isSelf(uid);
+    match /users/{uid}/pushTokens/{token} { allow read, create, update, delete: if isSelf(uid); }
+    match /publicProfiles/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid) && request.resource.data.uid == uid;
+      allow update: if isSelf(uid) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isSelf(uid);
     }
     match /usernames/{username} {
       allow read: if signedIn();

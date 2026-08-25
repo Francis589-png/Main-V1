@@ -4,21 +4,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
-    function memberPath(conversationId, uid) {
-      return /databases/$(database)/documents/conversations/$(conversationId)/members/$(uid);
-    }
-    function isMember(conversationId) {
-      return signedIn() && exists(memberPath(conversationId, request.auth.uid));
-    }
-    function memberRole(conversationId, uid) {
-      return get(memberPath(conversationId, uid)).data.role;
-    }
-    function isAdmin(conversationId) {
-      return isMember(conversationId) && memberRole(conversationId, request.auth.uid) in ['owner', 'admin'];
-    }
-    function onlyOwnMapKey(field) {
-      return request.resource.data[field].diff(resource.data[field]).affectedKeys().hasOnly([request.auth.uid]);
-    }
+    function memberPath(conversationId, uid) { return /databases/$(database)/documents/conversations/$(conversationId)/members/$(uid); }
+    function isMember(conversationId) { return signedIn() && exists(memberPath(conversationId, request.auth.uid)); }
+    function memberRole(conversationId, uid) { return get(memberPath(conversationId, uid)).data.role; }
+    function isAdmin(conversationId) { return isMember(conversationId) && memberRole(conversationId, request.auth.uid) in ['owner', 'admin']; }
+    function onlyOwnMapKey(field) { return request.resource.data[field].diff(resource.data[field]).affectedKeys().hasOnly([request.auth.uid]); }
 
     match /users/{uid} {
       allow read: if signedIn();
@@ -26,47 +16,34 @@ service cloud.firestore {
       allow update: if isSelf(uid) && request.resource.data.uid == resource.data.uid;
       allow delete: if false;
     }
-
     match /usernames/{username} {
       allow read: if signedIn();
       allow create: if isSelf(request.resource.data.uid);
       allow update: if false;
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
-
     match /userConversations/{uid}/items/{conversationId} {
       allow get: if isSelf(uid);
       allow list: if isSelf(uid) && request.query.limit <= 50;
       allow create: if isSelf(uid) && request.resource.data.chatId == conversationId;
-      allow update: if isSelf(uid)
-        && request.resource.data.chatId == resource.data.chatId
+      allow update: if isSelf(uid) && request.resource.data.chatId == resource.data.chatId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadCount']);
       allow delete: if isSelf(uid);
     }
 
     match /conversations/{conversationId} {
-      allow create: if signedIn()
-        && request.resource.data.type in ['direct', 'group']
-        && request.resource.data.createdBy == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.type in ['direct', 'group'] && request.resource.data.createdBy == request.auth.uid;
       allow read: if isMember(conversationId);
-      allow update: if isMember(conversationId)
-        && (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'lastMessage', 'lastMessageAt', 'lastSenderId', 'updatedAt', 'pinnedBy', 'mutedBy'
-          ])
-          || isAdmin(conversationId)
-        );
+      allow update: if isMember(conversationId) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'updatedAt', 'pinnedBy', 'mutedBy'])
+        || isAdmin(conversationId)
+      );
       allow delete: if isAdmin(conversationId);
 
       match /members/{uid} {
         allow read: if isMember(conversationId);
-        allow create: if signedIn() && (
-          (uid == request.auth.uid && !exists(memberPath(conversationId, uid)))
-          || isAdmin(conversationId)
-        );
-        allow update: if isAdmin(conversationId)
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.role in ['owner', 'admin', 'member'];
+        allow create: if signedIn() && ((uid == request.auth.uid && !exists(memberPath(conversationId, uid))) || isAdmin(conversationId));
+        allow update: if isAdmin(conversationId) && request.resource.data.uid == resource.data.uid && request.resource.data.role in ['owner', 'admin', 'member'];
         allow delete: if isSelf(uid) || isAdmin(conversationId);
       }
 
@@ -77,14 +54,13 @@ service cloud.firestore {
           && request.resource.data.type in ['text', 'image', 'video', 'audio', 'document', 'voice']
           && request.resource.data.createdAt is timestamp;
         allow update: if isMember(conversationId) && (
-          (resource.data.senderId == request.auth.uid
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['editedAt', 'text', 'deletedAt', 'replyTo']))
+          (resource.data.senderId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['editedAt', 'text', 'deletedAt', 'replyTo']))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveredAt']) && onlyOwnMapKey('deliveredAt'))
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']) && onlyOwnMapKey('readBy'))
-          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']) && request.resource.data.reactions[request.auth.uid] is string)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']) && onlyOwnMapKey('reactions'))
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['starredBy']) && onlyOwnMapKey('starredBy'))
         );
-        allow delete: if isMember(conversationId)
-          && (resource.data.senderId == request.auth.uid || isAdmin(conversationId));
+        allow delete: if isMember(conversationId) && (resource.data.senderId == request.auth.uid || isAdmin(conversationId));
       }
     }
 
@@ -93,12 +69,10 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
     }
-
     match /notifications/{uid}/items/{notificationId} {
       allow read, update, delete: if isSelf(uid);
       allow create: if signedIn();
     }
-
     match /{document=**} { allow read, write: if false; }
   }
 }

@@ -2,7 +2,7 @@ import { db, auth, get, onValue, ref, set, update, firestore, collection, collec
 const requireFirestore = () => { if (!firestore) throw new Error('Firestore is not configured.'); return firestore; };
 const millis = value => typeof value === 'number' ? value : value?.toMillis ? value.toMillis() : value?.seconds ? value.seconds * 1000 : 0;
 export function conversationId(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
-async function writeConversationIndex(uid, chatId, data) { const fs = requireFirestore(); const indexRef = doc(fs, 'userConversations', uid, 'items', chatId); if ((await getDoc(indexRef)).exists()) return; await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: firestoreServerTimestamp() }); }
+async function writeConversationIndex(uid, chatId, data) { const fs = requireFirestore(); const indexRef = doc(fs, 'userConversations', uid, 'items', chatId); if ((await getDoc(indexRef)).exists()) return; await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: data.updatedAt || firestoreServerTimestamp() }); }
 async function backfillConversationIndexes(uid) {
   const fs = requireFirestore();
   const memberships = await getDocs(query(collectionGroup(fs, 'members'), where('uid', '==', uid), limit(100)));
@@ -13,7 +13,7 @@ async function backfillConversationIndexes(uid) {
     if (!conversation.exists()) continue;
     const data = conversation.data();
     if (data.type === 'group') {
-      await writeConversationIndex(uid, conversation.id, { type: 'group', groupName: data.name || 'Group', otherName: data.name || 'Group', lastMessage: data.lastMessage || '', lastSenderId: data.lastSenderId || '', lastMessageAt: data.lastMessageAt || null });
+      await writeConversationIndex(uid, conversation.id, { type: 'group', groupName: data.name || 'Group', otherName: data.name || 'Group', lastMessage: data.lastMessage || '', lastSenderId: data.lastSenderId || '', lastMessageAt: data.lastMessageAt || null, updatedAt: data.updatedAt || null });
       continue;
     }
     const memberSnapshot = await getDocs(collection(fs, 'conversations', conversation.id, 'members'));
@@ -21,7 +21,7 @@ async function backfillConversationIndexes(uid) {
     if (!other?.uid) continue;
     let otherName = 'Main user';
     if (db) otherName = (await get(ref(db, `publicProfiles/${other.uid}`))).val()?.displayName || otherName;
-    await writeConversationIndex(uid, conversation.id, { type: 'direct', otherUid: other.uid, otherName, lastMessage: data.lastMessage || '', lastSenderId: data.lastSenderId || '', lastMessageAt: data.lastMessageAt || null });
+    await writeConversationIndex(uid, conversation.id, { type: 'direct', otherUid: other.uid, otherName, lastMessage: data.lastMessage || '', lastSenderId: data.lastSenderId || '', lastMessageAt: data.lastMessageAt || null, updatedAt: data.updatedAt || null });
   }
 }
 export async function ensureDirectChat(otherUser) {

@@ -27,8 +27,8 @@ const millis = value => typeof value === 'number' ? value : value?.toMillis ? va
 export function conversationId(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
 
 async function writeConversationIndex(uid, chatId, data) {
-  const db = requireFirestore();
-  const indexRef = doc(db, 'userConversations', uid, 'items', chatId);
+  const fs = requireFirestore();
+  const indexRef = doc(fs, 'userConversations', uid, 'items', chatId);
   if ((await getDoc(indexRef)).exists()) return;
   await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: firestoreServerTimestamp() });
 }
@@ -84,13 +84,9 @@ export function watchChat(chatId, callback) {
   return onSnapshot(doc(fs, 'conversations', chatId), snapshot => callback(snapshot.exists() ? { chatId: snapshot.id, ...snapshot.data() } : null));
 }
 
+// Public discovery remains on the existing RTDB profile index until the profile migration is completed.
 export function watchPublicProfiles(callback) {
-  const fs = requireFirestore();
-  return onSnapshot(query(collection(fs, 'users'), limit(100)), snapshot => {
-    const profiles = {};
-    snapshot.forEach(item => { profiles[item.id] = { uid: item.id, ...item.data() }; });
-    callback(profiles);
-  }, () => callback({}));
+  return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {}));
 }
 
 function normalizeMessages(snapshot) {
@@ -158,7 +154,6 @@ export async function markDelivered(chatId, messageId, uid = auth.currentUser?.u
   if (!uid || !messageId) return;
   await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { [`deliveredAt.${uid}`]: firestoreServerTimestamp() });
 }
-
 export async function markRead(chatId, messageId) {
   const fs = requireFirestore();
   const uid = auth.currentUser?.uid;

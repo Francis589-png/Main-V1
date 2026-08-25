@@ -1,10 +1,10 @@
 {
   "name": "main-v1",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "build": "node scripts/build-config.mjs",
-    "check": "node --check app.js && node --check chat-service.js && node --check firebase.js && node --check scripts/build-config.mjs"
+    "check": "find . -type f -name '*.js' -not -path './node_modules/*' -print0 | xargs -0 -n1 node --check"
   }
 }

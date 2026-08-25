@@ -33,7 +33,8 @@ import {
   where,
   orderBy,
   limit,
-  onSnapshot
+  onSnapshot,
+  serverTimestamp as firestoreServerTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
@@ -83,5 +84,6 @@ export {
   where,
   orderBy,
   limit,
-  onSnapshot
+  onSnapshot,
+  firestoreServerTimestamp
 };

@@ -14,14 +14,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - name: Install root dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Install Cloud Functions dependencies
-        run: npm install --prefix functions --no-audit --no-fund
-      - name: Check JavaScript syntax
+        run: npm ci --prefix functions --no-audit --no-fund
+      - name: Check application JavaScript syntax
         run: npm run check
-      - name: Check Cloud Functions syntax
-        run: node --check functions/index.js
+      - name: Check Cloud Functions JavaScript syntax
+        run: npm run check:functions
       - name: Verify production build configuration script
         run: node --check scripts/build-config.mjs
       - name: Production build

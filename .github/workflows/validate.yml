@@ -20,9 +20,9 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Install root dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Install Cloud Functions dependencies
-        run: npm ci --prefix functions --no-audit --no-fund
+        run: npm install --prefix functions --no-audit --no-fund
       - name: Check application JavaScript syntax
         run: npm run check
       - name: Check Cloud Functions JavaScript syntax

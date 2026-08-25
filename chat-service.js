@@ -10,7 +10,9 @@ export async function ensureDirectChat(otherUser) {
   const meMember = doc(fs, 'conversations', chatId, 'members', me.uid); const otherMember = doc(fs, 'conversations', chatId, 'members', otherUser.uid);
   if (!(await getDoc(meMember)).exists()) await setDoc(meMember, { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   if (!(await getDoc(otherMember)).exists()) await setDoc(otherMember, { uid: otherUser.uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
-  await Promise.all([writeConversationIndex(me.uid, chatId, { type: 'direct', otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' }), writeConversationIndex(otherUser.uid, chatId, { type: 'direct', otherUid: me.uid, otherName: me.displayName || 'Main user' })]); return chatId;
+  // Clients may only create their own conversation index. The server creates the recipient index after a message is sent.
+  await writeConversationIndex(me.uid, chatId, { type: 'direct', otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' });
+  return chatId;
 }
 export async function createGroup(name, members) {
   const fs = requireFirestore(); const me = auth.currentUser; if (!me) throw new Error('You must be signed in.'); const cleanName = String(name || '').trim().slice(0, 80); const unique = [...new Set([me.uid, ...(members || []).filter(uid => uid && uid !== me.uid)])];
@@ -18,7 +20,7 @@ export async function createGroup(name, members) {
   await setDoc(conversationRef, { chatId: conversationRef.id, type: 'group', name: cleanName, createdBy: me.uid, createdAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp(), lastMessage: '', lastSenderId: '', lastMessageAt: null });
   await setDoc(doc(fs, 'conversations', conversationRef.id, 'members', me.uid), { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   for (const uid of unique.filter(item => item !== me.uid)) await setDoc(doc(fs, 'conversations', conversationRef.id, 'members', uid), { uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
-  await Promise.all(unique.map(uid => writeConversationIndex(uid, conversationRef.id, { type: 'group', groupName: cleanName, otherName: cleanName }))); return conversationRef.id;
+  await writeConversationIndex(me.uid, conversationRef.id, { type: 'group', groupName: cleanName, otherName: cleanName }); return conversationRef.id;
 }
 export function watchUserChats(uid, callback) { const fs = requireFirestore(); const q = query(collection(fs, 'userConversations', uid, 'items'), orderBy('updatedAt', 'desc'), limit(50)); return onSnapshot(q, snapshot => { const chats = {}; snapshot.forEach(item => { const data = item.data(); chats[item.id] = { chatId: item.id, ...data, updatedAt: millis(data.updatedAt) }; }); callback(chats); }, error => callback({}, error)); }
 export function watchChat(chatId, callback) { const fs = requireFirestore(); return onSnapshot(doc(fs, 'conversations', chatId), snapshot => callback(snapshot.exists() ? { chatId: snapshot.id, ...snapshot.data() } : null)); }

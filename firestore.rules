@@ -28,7 +28,6 @@ service cloud.firestore {
       allow update: if isSelf(uid) && request.resource.data.chatId == resource.data.chatId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadCount']);
       allow delete: if isSelf(uid) || isAdmin(conversationId);
     }
-
     match /conversations/{conversationId} {
       allow create: if signedIn() && request.resource.data.type in ['direct', 'group'] && request.resource.data.createdBy == request.auth.uid;
       allow read: if isMember(conversationId);
@@ -48,7 +47,7 @@ service cloud.firestore {
       }
     }
     match /media/{mediaId} {
-      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.ownerId == request.auth.uid || (resource.data.conversationId != null && isMember(resource.data.conversationId)));
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
     }

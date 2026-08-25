@@ -3,7 +3,8 @@ import {
   configured,
   onAuthStateChanged,
   sendEmailVerification,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  signOut
 } from './firebase.js';
 import { ensureUserProfile } from './firestore-service.js';
 
@@ -46,6 +47,18 @@ function addPasswordReset() {
   $('authSwitch')?.after(button);
 }
 
+async function sendInitialVerification(user) {
+  const key = `main-verification-sent:${user.uid}`;
+  if (sessionStorage.getItem(key)) return;
+  try {
+    await sendEmailVerification(user);
+    sessionStorage.setItem(key, '1');
+    toast('Verification email sent. Check your inbox.');
+  } catch {
+    // The resend button remains available if Firebase rate-limits the request.
+  }
+}
+
 function showVerificationGate(user) {
   const screen = $('authScreen');
   const app = $('app');
@@ -65,6 +78,7 @@ function showVerificationGate(user) {
     event.currentTarget.disabled = true;
     try {
       await sendEmailVerification(user);
+      sessionStorage.setItem(`main-verification-sent:${user.uid}`, '1');
       toast('Verification email sent again.');
     } catch {
       toast('Could not send verification email yet.');
@@ -73,7 +87,6 @@ function showVerificationGate(user) {
     }
   };
   gate.querySelector('#verificationLogout').onclick = async () => {
-    const { signOut } = await import('./firebase.js');
     await signOut(auth);
     window.location.reload();
   };
@@ -86,8 +99,9 @@ async function refreshVerification() {
   if (user.emailVerified) {
     const gate = $('verificationGate');
     if (gate) window.location.reload();
-    try { await ensureUserProfile(user); } catch { /* Firestore may not be enabled yet. */ }
+    try { await ensureUserProfile(user); } catch { /* Firestore configuration can be completed independently. */ }
   } else {
+    await sendInitialVerification(user);
     showVerificationGate(user);
   }
 }

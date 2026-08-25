@@ -1,27 +1,6 @@
 import { auth, firestore, collection, query, orderBy, startAt, endAt, where, limit, getDocs } from './firebase.js';
-
 const requireFirestore = () => { if (!firestore) throw new Error('Firestore is not configured.'); return firestore; };
-const clean = value => String(value || '').trim().toLowerCase();
-const prefixEnd = value => `${value}\uf8ff`;
-
-export async function searchUsers(term, pageSize = 20) {
-  const fs = requireFirestore(); const value = clean(term); if (!value) return [];
-  const q = query(collection(fs, 'users'), orderBy('username'), startAt(value), endAt(prefixEnd(value)), limit(pageSize));
-  const snapshot = await getDocs(q); return snapshot.docs.map(item => ({ uid: item.id, ...item.data() }));
-}
-
-export async function searchConversations(term, pageSize = 20) {
-  const fs = requireFirestore(); const uid = auth.currentUser?.uid; const value = clean(term); if (!uid || !value) return [];
-  const base = collection(fs, 'userConversations', uid, 'items');
-  const [nameSnapshot, groupSnapshot] = await Promise.all([
-    getDocs(query(base, orderBy('otherName'), startAt(value), endAt(prefixEnd(value)), limit(pageSize))),
-    getDocs(query(base, orderBy('groupName'), startAt(value), endAt(prefixEnd(value)), limit(pageSize)))
-  ]);
-  const results = new Map(); [...nameSnapshot.docs, ...groupSnapshot.docs].forEach(item => results.set(item.id, { chatId: item.id, ...item.data() })); return [...results.values()].slice(0, pageSize);
-}
-
-export async function searchMessages(chatId, term, pageSize = 30) {
-  const fs = requireFirestore(); const value = clean(term); if (!auth.currentUser || !chatId || !value) return [];
-  const q = query(collection(fs, 'conversations', chatId, 'messages'), where('searchTokens', 'array-contains', value), orderBy('createdAt', 'desc'), limit(pageSize));
-  const snapshot = await getDocs(q); return snapshot.docs.map(item => ({ id: item.id, ...item.data() })).reverse();
-}
+const clean = value => String(value || '').trim().toLowerCase(); const prefixEnd = value => `${value}\uf8ff`;
+export async function searchUsers(term, pageSize = 20) { const fs = requireFirestore(); const value = clean(term); if (!value) return []; const q = query(collection(fs, 'publicProfiles'), orderBy('username'), startAt(value), endAt(prefixEnd(value)), limit(pageSize)); const snapshot = await getDocs(q); return snapshot.docs.map(item => ({ uid: item.id, ...item.data() })); }
+export async function searchConversations(term, pageSize = 20) { const fs = requireFirestore(); const uid = auth.currentUser?.uid; const value = clean(term); if (!uid || !value) return []; const base = collection(fs, 'userConversations', uid, 'items'); const [nameSnapshot, groupSnapshot] = await Promise.all([getDocs(query(base, orderBy('otherName'), startAt(value), endAt(prefixEnd(value)), limit(pageSize))), getDocs(query(base, orderBy('groupName'), startAt(value), endAt(prefixEnd(value)), limit(pageSize)))]); const results = new Map(); [...nameSnapshot.docs, ...groupSnapshot.docs].forEach(item => results.set(item.id, { chatId: item.id, ...item.data() })); return [...results.values()].slice(0, pageSize); }
+export async function searchMessages(chatId, term, pageSize = 30) { const fs = requireFirestore(); const value = clean(term); if (!auth.currentUser || !chatId || !value) return []; const q = query(collection(fs, 'conversations', chatId, 'messages'), where('searchTokens', 'array-contains', value), orderBy('createdAt', 'desc'), limit(pageSize)); const snapshot = await getDocs(q); return snapshot.docs.map(item => ({ id: item.id, ...item.data() })).reverse(); }

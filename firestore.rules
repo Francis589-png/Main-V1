@@ -43,7 +43,15 @@ service cloud.firestore {
       allow delete: if isAdmin(conversationId);
       match /members/{uid} {
         allow read: if isMember(conversationId);
-        allow create: if signedIn() && ((uid == request.auth.uid && !exists(memberPath(conversationId, uid))) || isAdmin(conversationId));
+        allow create: if signedIn() && (
+          (uid == request.auth.uid && !exists(memberPath(conversationId, uid))) ||
+          isAdmin(conversationId) ||
+          (uid != request.auth.uid &&
+           get(/databases/$(database)/documents/conversations/$(conversationId)).data.type == 'direct' &&
+           get(/databases/$(database)/documents/conversations/$(conversationId)).data.createdBy == request.auth.uid &&
+           request.resource.data.uid == uid &&
+           request.resource.data.role == 'member')
+        );
         allow update: if isAdmin(conversationId) && request.resource.data.uid == resource.data.uid && request.resource.data.role in ['owner', 'admin', 'member'];
         allow delete: if isSelf(uid) || isAdmin(conversationId);
       }

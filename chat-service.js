@@ -1,6 +1,7 @@
 import {
   db,
   auth,
+  get,
   onValue,
   ref,
   set,
@@ -84,7 +85,6 @@ export function watchChat(chatId, callback) {
   return onSnapshot(doc(fs, 'conversations', chatId), snapshot => callback(snapshot.exists() ? { chatId: snapshot.id, ...snapshot.data() } : null));
 }
 
-// Public discovery remains on the existing RTDB profile index until the profile migration is completed.
 export function watchPublicProfiles(callback) {
   return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {}));
 }
@@ -115,7 +115,12 @@ export function watchMessages(chatId, callback) {
         const prefix = `${uid}_`;
         const otherUid = chatId.startsWith(prefix) ? chatId.slice(prefix.length) : chatId.endsWith(`_${uid}`) ? chatId.slice(0, -(uid.length + 1)) : '';
         if (!otherUid) throw new Error('Conversation could not be identified.');
-        await ensureDirectChat({ uid: otherUid, displayName: 'Main user' });
+        let displayName = 'Main user';
+        if (db) {
+          const profile = (await get(ref(db, `publicProfiles/${otherUid}`))).val();
+          displayName = profile?.displayName || displayName;
+        }
+        await ensureDirectChat({ uid: otherUid, displayName });
       } else if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', auth.currentUser.uid))).exists()) {
         throw new Error('You are not a member of this conversation.');
       }

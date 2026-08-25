@@ -1,183 +1,63 @@
 import { db, auth, get, onValue, ref, set, update, firestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot, firestoreServerTimestamp } from './firebase.js';
-
-const requireFirestore = () => {
-  if (!firestore) throw new Error('Firestore is not configured.');
-  return firestore;
-};
+const requireFirestore = () => { if (!firestore) throw new Error('Firestore is not configured.'); return firestore; };
 const millis = value => typeof value === 'number' ? value : value?.toMillis ? value.toMillis() : value?.seconds ? value.seconds * 1000 : 0;
-
 export function conversationId(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
-
-async function writeConversationIndex(uid, chatId, data) {
-  const fs = requireFirestore();
-  const indexRef = doc(fs, 'userConversations', uid, 'items', chatId);
-  if ((await getDoc(indexRef)).exists()) return;
-  await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: firestoreServerTimestamp() });
-}
-
+async function writeConversationIndex(uid, chatId, data) { const fs = requireFirestore(); const indexRef = doc(fs, 'userConversations', uid, 'items', chatId); if ((await getDoc(indexRef)).exists()) return; await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: firestoreServerTimestamp() }); }
 export async function ensureDirectChat(otherUser) {
-  const fs = requireFirestore();
-  const me = auth.currentUser;
+  const fs = requireFirestore(); const me = auth.currentUser;
   if (!me || !otherUser?.uid || otherUser.uid === me.uid) throw new Error('A valid other user is required.');
-  const chatId = conversationId(me.uid, otherUser.uid);
-  const conversationRef = doc(fs, 'conversations', chatId);
+  const chatId = conversationId(me.uid, otherUser.uid); const conversationRef = doc(fs, 'conversations', chatId);
   if (!(await getDoc(conversationRef)).exists()) await setDoc(conversationRef, { chatId, type: 'direct', name: '', createdBy: me.uid, createdAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp(), lastMessage: '', lastSenderId: '', lastMessageAt: null });
-  const meMember = doc(fs, 'conversations', chatId, 'members', me.uid);
-  const otherMember = doc(fs, 'conversations', chatId, 'members', otherUser.uid);
+  const meMember = doc(fs, 'conversations', chatId, 'members', me.uid); const otherMember = doc(fs, 'conversations', chatId, 'members', otherUser.uid);
   if (!(await getDoc(meMember)).exists()) await setDoc(meMember, { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   if (!(await getDoc(otherMember)).exists()) await setDoc(otherMember, { uid: otherUser.uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
-  await Promise.all([
-    writeConversationIndex(me.uid, chatId, { type: 'direct', otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' }),
-    writeConversationIndex(otherUser.uid, chatId, { type: 'direct', otherUid: me.uid, otherName: me.displayName || 'Main user' })
-  ]);
+  await Promise.all([writeConversationIndex(me.uid, chatId, { type: 'direct', otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' }), writeConversationIndex(otherUser.uid, chatId, { type: 'direct', otherUid: me.uid, otherName: me.displayName || 'Main user' })]);
   return chatId;
 }
-
 export async function createGroup(name, members) {
-  const fs = requireFirestore();
-  const me = auth.currentUser;
-  if (!me) throw new Error('You must be signed in.');
-  const cleanName = String(name || '').trim().slice(0, 80);
-  const unique = [...new Set([me.uid, ...(members || []).filter(uid => uid && uid !== me.uid)])];
-  if (!cleanName) throw new Error('Enter a group name.');
-  if (unique.length < 2) throw new Error('A group needs at least one other person.');
-  const conversationRef = doc(collection(fs, 'conversations'));
-  await setDoc(conversationRef, { chatId: conversationRef.id, type: 'group', name: cleanName, createdBy: me.uid, createdAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp(), lastMessage: '', lastSenderId: '', lastMessageAt: null });
+  const fs = requireFirestore(); const me = auth.currentUser; if (!me) throw new Error('You must be signed in.');
+  const cleanName = String(name || '').trim().slice(0, 80); const unique = [...new Set([me.uid, ...(members || []).filter(uid => uid && uid !== me.uid)])];
+  if (!cleanName) throw new Error('Enter a group name.'); if (unique.length < 2) throw new Error('A group needs at least one other person.');
+  const conversationRef = doc(collection(fs, 'conversations')); await setDoc(conversationRef, { chatId: conversationRef.id, type: 'group', name: cleanName, createdBy: me.uid, createdAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp(), lastMessage: '', lastSenderId: '', lastMessageAt: null });
   await setDoc(doc(fs, 'conversations', conversationRef.id, 'members', me.uid), { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   for (const uid of unique.filter(item => item !== me.uid)) await setDoc(doc(fs, 'conversations', conversationRef.id, 'members', uid), { uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
-  await Promise.all(unique.map(uid => writeConversationIndex(uid, conversationRef.id, { type: 'group', groupName: cleanName, otherName: cleanName })));
-  return conversationRef.id;
+  await Promise.all(unique.map(uid => writeConversationIndex(uid, conversationRef.id, { type: 'group', groupName: cleanName, otherName: cleanName }))); return conversationRef.id;
 }
-
 export function watchUserChats(uid, callback) {
-  const fs = requireFirestore();
-  const q = query(collection(fs, 'userConversations', uid, 'items'), orderBy('updatedAt', 'desc'), limit(50));
-  return onSnapshot(q, snapshot => {
-    const chats = {};
-    snapshot.forEach(item => { const data = item.data(); chats[item.id] = { chatId: item.id, ...data, updatedAt: millis(data.updatedAt) }; });
-    callback(chats);
-  }, error => callback({}, error));
+  const fs = requireFirestore(); const q = query(collection(fs, 'userConversations', uid, 'items'), orderBy('updatedAt', 'desc'), limit(50));
+  return onSnapshot(q, snapshot => { const chats = {}; snapshot.forEach(item => { const data = item.data(); chats[item.id] = { chatId: item.id, ...data, updatedAt: millis(data.updatedAt) }; }); callback(chats); }, error => callback({}, error));
 }
-
-export function watchChat(chatId, callback) {
-  const fs = requireFirestore();
-  return onSnapshot(doc(fs, 'conversations', chatId), snapshot => callback(snapshot.exists() ? { chatId: snapshot.id, ...snapshot.data() } : null));
-}
-
-export function watchPublicProfiles(callback) {
-  return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {}));
-}
-
+export function watchChat(chatId, callback) { const fs = requireFirestore(); return onSnapshot(doc(fs, 'conversations', chatId), snapshot => callback(snapshot.exists() ? { chatId: snapshot.id, ...snapshot.data() } : null)); }
+export function watchPublicProfiles(callback) { return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {})); }
 function normalizeMessages(snapshot) {
-  return snapshot.docs.map(item => {
-    const data = item.data();
-    return {
-      id: item.id,
-      ...data,
-      createdAt: millis(data.createdAt),
-      deliveredAt: Object.fromEntries(Object.entries(data.deliveredAt || {}).map(([uid, value]) => [uid, millis(value)])),
-      readBy: Object.fromEntries(Object.entries(data.readBy || {}).map(([uid, value]) => [uid, millis(value)]))
-    };
-  }).reverse();
+  return snapshot.docs.map(item => { const data = item.data(); return { id: item.id, ...data, createdAt: millis(data.createdAt), deliveredAt: Object.fromEntries(Object.entries(data.deliveredAt || {}).map(([uid, value]) => [uid, millis(value)])), readBy: Object.fromEntries(Object.entries(data.readBy || {}).map(([uid, value]) => [uid, millis(value)])) }; }).reverse();
 }
-
 export function watchMessages(chatId, callback) {
-  const fs = requireFirestore();
-  let cancelled = false;
-  let unsubscribe = null;
-  (async () => {
-    try {
-      const conversationRef = doc(fs, 'conversations', chatId);
-      const conversation = await getDoc(conversationRef);
-      if (!conversation.exists()) {
-        const uid = auth.currentUser?.uid || '';
-        const prefix = `${uid}_`;
-        const otherUid = chatId.startsWith(prefix) ? chatId.slice(prefix.length) : chatId.endsWith(`_${uid}`) ? chatId.slice(0, -(uid.length + 1)) : '';
-        if (!otherUid) throw new Error('Conversation could not be identified.');
-        let displayName = 'Main user';
-        if (db) displayName = (await get(ref(db, `publicProfiles/${otherUid}`))).val()?.displayName || displayName;
-        await ensureDirectChat({ uid: otherUid, displayName });
-      } else if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', auth.currentUser.uid))).exists()) throw new Error('You are not a member of this conversation.');
-      if (cancelled) return;
-      const q = query(collection(fs, 'conversations', chatId, 'messages'), orderBy('createdAt', 'desc'), limit(50));
-      unsubscribe = onSnapshot(q, snapshot => callback(normalizeMessages(snapshot)), error => callback([], error));
-    } catch (error) { callback([], error); }
-  })();
+  const fs = requireFirestore(); let cancelled = false; let unsubscribe = null;
+  (async () => { try {
+    const conversationRef = doc(fs, 'conversations', chatId); const conversation = await getDoc(conversationRef);
+    if (!conversation.exists()) {
+      const uid = auth.currentUser?.uid || ''; const prefix = `${uid}_`; const otherUid = chatId.startsWith(prefix) ? chatId.slice(prefix.length) : chatId.endsWith(`_${uid}`) ? chatId.slice(0, -(uid.length + 1)) : '';
+      if (!otherUid) throw new Error('Conversation could not be identified.'); let displayName = 'Main user'; if (db) displayName = (await get(ref(db, `publicProfiles/${otherUid}`))).val()?.displayName || displayName; await ensureDirectChat({ uid: otherUid, displayName });
+    } else if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', auth.currentUser.uid))).exists()) throw new Error('You are not a member of this conversation.');
+    if (cancelled) return; const q = query(collection(fs, 'conversations', chatId, 'messages'), orderBy('createdAt', 'desc'), limit(50));
+    unsubscribe = onSnapshot(q, snapshot => { const messages = normalizeMessages(snapshot); window.__mainActiveMessages = messages; window.__mainActiveChatId = chatId; callback(messages); }, error => callback([], error));
+  } catch (error) { callback([], error); } })();
   return () => { cancelled = true; if (unsubscribe) unsubscribe(); };
 }
-
 export function watchPresence(uid, callback) { return onValue(ref(db, `presence/${uid}`), snapshot => callback(snapshot.val() || { online: false })); }
 export function watchTyping(chatId, otherUid, callback) { return onValue(ref(db, `typing/${chatId}/${otherUid}`), snapshot => { const value = snapshot.val(); callback(Boolean(value && Date.now() - Number(value) < 3000)); }); }
-
 export async function sendMessage(chatId, text, options = {}) {
-  const fs = requireFirestore();
-  const me = auth.currentUser;
-  if (!me) throw new Error('You must be signed in.');
-  const cleanText = String(text || '').trim();
-  if (!cleanText) return null;
+  const fs = requireFirestore(); const me = auth.currentUser; if (!me) throw new Error('You must be signed in.'); const cleanText = String(text || '').trim(); if (!cleanText) return null;
   if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', me.uid))).exists()) throw new Error('You are not a member of this conversation.');
-  const messageRef = doc(collection(fs, 'conversations', chatId, 'messages'));
-  await setDoc(messageRef, { senderId: me.uid, type: options.type || 'text', text: cleanText, replyTo: options.replyTo || null, forwardedFrom: options.forwardedFrom || null, mediaId: options.mediaId || null, createdAt: firestoreServerTimestamp(), deliveredAt: { [me.uid]: firestoreServerTimestamp() }, readBy: { [me.uid]: firestoreServerTimestamp() }, reactions: {}, starredBy: {} });
-  await updateDoc(doc(fs, 'conversations', chatId), { lastMessage: cleanText || `[${options.type || 'text'}]`, lastSenderId: me.uid, lastMessageAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp() });
-  return messageRef.id;
+  const messageRef = doc(collection(fs, 'conversations', chatId, 'messages')); await setDoc(messageRef, { senderId: me.uid, type: options.type || 'text', text: cleanText, replyTo: options.replyTo || null, forwardedFrom: options.forwardedFrom || null, mediaId: options.mediaId || null, createdAt: firestoreServerTimestamp(), deliveredAt: { [me.uid]: firestoreServerTimestamp() }, readBy: { [me.uid]: firestoreServerTimestamp() }, reactions: {}, starredBy: {} });
+  await updateDoc(doc(fs, 'conversations', chatId), { lastMessage: cleanText || `[${options.type || 'text'}]`, lastSenderId: me.uid, lastMessageAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp() }); return messageRef.id;
 }
-
-export async function deleteMessage(chatId, messageId) {
-  const fs = requireFirestore();
-  const uid = auth.currentUser?.uid;
-  if (!uid || !messageId) return;
-  const messageRef = doc(fs, 'conversations', chatId, 'messages', messageId);
-  const snapshot = await getDoc(messageRef);
-  if (!snapshot.exists()) return;
-  if (snapshot.data().senderId !== uid) throw new Error('Only the sender can delete this message.');
-  await deleteDoc(messageRef);
-}
-
-export async function toggleReaction(chatId, messageId, emoji) {
-  const fs = requireFirestore();
-  const uid = auth.currentUser?.uid;
-  if (!uid || !messageId || !emoji) return;
-  const snapshot = await getDoc(doc(fs, 'conversations', chatId, 'messages', messageId));
-  if (!snapshot.exists()) throw new Error('Message no longer exists.');
-  const reactions = { ...(snapshot.data().reactions || {}) };
-  if (reactions[uid] === emoji) delete reactions[uid]; else reactions[uid] = emoji;
-  await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { reactions });
-}
-
-export async function toggleStar(chatId, messageId) {
-  const fs = requireFirestore();
-  const uid = auth.currentUser?.uid;
-  if (!uid || !messageId) return;
-  const snapshot = await getDoc(doc(fs, 'conversations', chatId, 'messages', messageId));
-  if (!snapshot.exists()) throw new Error('Message no longer exists.');
-  const starredBy = { ...(snapshot.data().starredBy || {}) };
-  if (starredBy[uid]) delete starredBy[uid]; else starredBy[uid] = true;
-  await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { starredBy });
-}
-
-export async function forwardMessage(sourceChatId, messageId, targetChatId) {
-  const fs = requireFirestore();
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('You must be signed in.');
-  const source = await getDoc(doc(fs, 'conversations', sourceChatId, 'messages', messageId));
-  if (!source.exists()) throw new Error('Message no longer exists.');
-  if (!(await getDoc(doc(fs, 'conversations', targetChatId, 'members', uid))).exists()) throw new Error('You are not a member of the target conversation.');
-  const data = source.data();
-  return sendMessage(targetChatId, data.text || '', { type: data.type || 'text', mediaId: data.mediaId || null, forwardedFrom: { conversationId: sourceChatId, messageId } });
-}
-
-export async function markDelivered(chatId, messageId, uid = auth.currentUser?.uid) {
-  const fs = requireFirestore();
-  if (!uid || !messageId) return;
-  await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { [`deliveredAt.${uid}`]: firestoreServerTimestamp() });
-}
-export async function markRead(chatId, messageId) {
-  const fs = requireFirestore();
-  const uid = auth.currentUser?.uid;
-  if (!uid || !messageId) return;
-  await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { [`readBy.${uid}`]: firestoreServerTimestamp() });
-  await updateDoc(doc(fs, 'conversations', chatId, 'members', uid), { lastReadMessageId: messageId, lastReadAt: firestoreServerTimestamp() });
-  await updateDoc(doc(fs, 'userConversations', uid, 'items', chatId), { unreadCount: 0 });
-}
+export async function deleteMessage(chatId, messageId) { const fs = requireFirestore(); const uid = auth.currentUser?.uid; if (!uid || !messageId) return; const messageRef = doc(fs, 'conversations', chatId, 'messages', messageId); const snapshot = await getDoc(messageRef); if (!snapshot.exists()) return; if (snapshot.data().senderId !== uid) throw new Error('Only the sender can delete this message.'); await deleteDoc(messageRef); }
+export async function toggleReaction(chatId, messageId, emoji) { const fs = requireFirestore(); const uid = auth.currentUser?.uid; if (!uid || !messageId || !emoji) return; const messageRef = doc(fs, 'conversations', chatId, 'messages', messageId); const snapshot = await getDoc(messageRef); if (!snapshot.exists()) throw new Error('Message no longer exists.'); const reactions = { ...(snapshot.data().reactions || {}) }; if (reactions[uid] === emoji) delete reactions[uid]; else reactions[uid] = emoji; await updateDoc(messageRef, { reactions }); }
+export async function toggleStar(chatId, messageId) { const fs = requireFirestore(); const uid = auth.currentUser?.uid; if (!uid || !messageId) return; const messageRef = doc(fs, 'conversations', chatId, 'messages', messageId); const snapshot = await getDoc(messageRef); if (!snapshot.exists()) throw new Error('Message no longer exists.'); const starredBy = { ...(snapshot.data().starredBy || {}) }; if (starredBy[uid]) delete starredBy[uid]; else starredBy[uid] = true; await updateDoc(messageRef, { starredBy }); }
+export async function forwardMessage(sourceChatId, messageId, targetChatId) { const fs = requireFirestore(); const uid = auth.currentUser?.uid; if (!uid) throw new Error('You must be signed in.'); const source = await getDoc(doc(fs, 'conversations', sourceChatId, 'messages', messageId)); if (!source.exists()) throw new Error('Message no longer exists.'); if (!(await getDoc(doc(fs, 'conversations', targetChatId, 'members', uid))).exists()) throw new Error('You are not a member of the target conversation.'); const data = source.data(); return sendMessage(targetChatId, data.text || '', { type: data.type || 'text', mediaId: data.mediaId || null, forwardedFrom: { conversationId: sourceChatId, messageId } }); }
+export async function markDelivered(chatId, messageId, uid = auth.currentUser?.uid) { const fs = requireFirestore(); if (!uid || !messageId) return; await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { [`deliveredAt.${uid}`]: firestoreServerTimestamp() }); }
+export async function markRead(chatId, messageId) { const fs = requireFirestore(); const uid = auth.currentUser?.uid; if (!uid || !messageId) return; await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { [`readBy.${uid}`]: firestoreServerTimestamp() }); await updateDoc(doc(fs, 'conversations', chatId, 'members', uid), { lastReadMessageId: messageId, lastReadAt: firestoreServerTimestamp() }); await updateDoc(doc(fs, 'userConversations', uid, 'items', chatId), { unreadCount: 0 }); }
 export async function markTyping(chatId, typing) { if (auth.currentUser && db) await set(ref(db, `typing/${chatId}/${auth.currentUser.uid}`), typing ? Date.now() : null); }
 export async function updatePresence(online) { if (auth.currentUser && db) await update(ref(db, `presence/${auth.currentUser.uid}`), { online, lastSeen: Date.now() }); }

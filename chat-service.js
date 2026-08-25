@@ -1,7 +1,6 @@
 import {
   db,
   auth,
-  get,
   onValue,
   ref,
   set,
@@ -35,11 +34,10 @@ export function conversationId(uidA, uidB) { return [uidA, uidB].sort().join('_'
 
 async function writeConversationIndex(uid, chatId, data) {
   const db = requireFirestore();
-  await setDoc(doc(db, 'userConversations', uid, 'items', chatId), {
-    chatId,
-    ...data,
-    updatedAt: firestoreServerTimestamp()
-  }, { merge: true });
+  const indexRef = doc(db, 'userConversations', uid, 'items', chatId);
+  const existing = await getDoc(indexRef);
+  if (existing.exists()) return;
+  await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: firestoreServerTimestamp() });
 }
 
 export async function ensureDirectChat(otherUser) {
@@ -67,30 +65,17 @@ export async function ensureDirectChat(otherUser) {
 
   const meMember = doc(fs, 'conversations', chatId, 'members', me.uid);
   const otherMember = doc(fs, 'conversations', chatId, 'members', otherUser.uid);
-  const meSnapshot = await getDoc(meMember);
-  if (!meSnapshot.exists()) {
+  if (!(await getDoc(meMember)).exists()) {
     await setDoc(meMember, { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   }
-  const otherSnapshot = await getDoc(otherMember);
-  if (!otherSnapshot.exists()) {
+  if (!(await getDoc(otherMember)).exists()) {
     await setDoc(otherMember, { uid: otherUser.uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   }
 
   await Promise.all([
-    writeConversationIndex(me.uid, chatId, {
-      type: 'direct',
-      otherUid: otherUser.uid,
-      otherName: otherUser.displayName || 'Main user',
-      unreadCount: 0
-    }),
-    writeConversationIndex(otherUser.uid, chatId, {
-      type: 'direct',
-      otherUid: me.uid,
-      otherName: me.displayName || 'Main user',
-      unreadCount: 0
-    })
+    writeConversationIndex(me.uid, chatId, { type: 'direct', otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' }),
+    writeConversationIndex(otherUser.uid, chatId, { type: 'direct', otherUid: me.uid, otherName: me.displayName || 'Main user' })
   ]);
-
   return chatId;
 }
 
@@ -115,7 +100,6 @@ export async function createGroup(name, members) {
     lastSenderId: '',
     lastMessageAt: null
   });
-
   await setDoc(doc(fs, 'conversations', conversationRef.id, 'members', me.uid), {
     uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null
   });
@@ -125,18 +109,14 @@ export async function createGroup(name, members) {
     });
   }
   await Promise.all(unique.map(uid => writeConversationIndex(uid, conversationRef.id, {
-    type: 'group', groupName: cleanName, otherName: cleanName, unreadCount: 0
+    type: 'group', groupName: cleanName, otherName: cleanName
   })));
   return conversationRef.id;
 }
 
 export function watchUserChats(uid, callback) {
   const fs = requireFirestore();
-  const q = query(
-    collection(fs, 'userConversations', uid, 'items'),
-    orderBy('updatedAt', 'desc'),
-    limit(50)
-  );
+  const q = query(collection(fs, 'userConversations', uid, 'items'), orderBy('updatedAt', 'desc'), limit(50));
   return onSnapshot(q, snapshot => {
     const chats = {};
     snapshot.forEach(item => {
@@ -159,16 +139,12 @@ export function watchPublicProfiles(callback) {
     const profiles = {};
     snapshot.forEach(item => { profiles[item.id] = { uid: item.id, ...item.data() }; });
     callback(profiles);
-  }, error => callback({}));
+  }, () => callback({}));
 }
 
 export function watchMessages(chatId, callback) {
   const fs = requireFirestore();
-  const q = query(
-    collection(fs, 'conversations', chatId, 'messages'),
-    orderBy('createdAt', 'desc'),
-    limit(50)
-  );
+  const q = query(collection(fs, 'conversations', chatId, 'messages'), orderBy('createdAt', 'desc'), limit(50));
   return onSnapshot(q, snapshot => {
     const messages = snapshot.docs.map(item => {
       const data = item.data();
@@ -201,12 +177,12 @@ export async function sendMessage(chatId, text, options = {}) {
   if (!me) throw new Error('You must be signed in.');
   const cleanText = String(text || '').trim();
   if (!cleanText) return null;
-
-  const memberSnapshot = await getDoc(doc(fs, 'conversations', chatId, 'members', me.uid));
-  if (!memberSnapshot.exists()) throw new Error('You are not a member of this conversation.');
+  if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', me.uid))).exists()) {
+    throw new Error('You are not a member of this conversation.');
+  }
 
   const messageRef = doc(collection(fs, 'conversations', chatId, 'messages'));
-  const message = {
+  await setDoc(messageRef, {
     senderId: me.uid,
     type: options.type || 'text',
     text: cleanText,
@@ -217,18 +193,13 @@ export async function sendMessage(chatId, text, options = {}) {
     readBy: { [me.uid]: firestoreServerTimestamp() },
     reactions: {},
     starredBy: {}
-  };
-  await setDoc(messageRef, message);
-  const preview = cleanText || `[${message.type}]`;
+  });
   await updateDoc(doc(fs, 'conversations', chatId), {
-    lastMessage: preview,
+    lastMessage: cleanText || `[${options.type || 'text'}]`,
     lastSenderId: me.uid,
     lastMessageAt: firestoreServerTimestamp(),
     updatedAt: firestoreServerTimestamp()
   });
-
-  const membersSnapshot = await getDoc(doc(fs, 'conversations', chatId, 'members', me.uid));
-  if (!membersSnapshot.exists()) throw new Error('Conversation membership changed.');
   return messageRef.id;
 }
 
@@ -251,10 +222,7 @@ export async function markRead(chatId, messageId) {
     lastReadMessageId: messageId,
     lastReadAt: firestoreServerTimestamp()
   });
-  await setDoc(doc(fs, 'userConversations', uid, 'items', chatId), {
-    unreadCount: 0,
-    updatedAt: firestoreServerTimestamp()
-  }, { merge: true });
+  await updateDoc(doc(fs, 'userConversations', uid, 'items', chatId), { unreadCount: 0 });
 }
 
 export async function markTyping(chatId, typing) {

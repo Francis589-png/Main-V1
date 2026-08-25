@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-config.mjs",
-    "check": "find . -type f -name '*.js' -not -path './node_modules/*' -print0 | xargs -0 -n1 node --check",
+    "check": "find . -type f -name '*.js' -not -path './node_modules/*' -not -path './functions/node_modules/*' -not -path './dist/*' -not -path './build/*' -print0 | xargs -0 -r -n1 node --check",
+    "check:functions": "find functions -type f -name '*.js' -not -path 'functions/node_modules/*' -print0 | xargs -0 -r -n1 node --check",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore.rules.test.mjs\""
   },
   "devDependencies": {

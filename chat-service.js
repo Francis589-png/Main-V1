@@ -1,23 +1,4 @@
-import {
-  db,
-  auth,
-  get,
-  onValue,
-  ref,
-  set,
-  update,
-  firestore,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  query,
-  orderBy,
-  limit,
-  onSnapshot,
-  firestoreServerTimestamp
-} from './firebase.js';
+import { db, auth, get, onValue, ref, set, update, firestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot, firestoreServerTimestamp } from './firebase.js';
 
 const requireFirestore = () => {
   if (!firestore) throw new Error('Firestore is not configured.');
@@ -40,9 +21,7 @@ export async function ensureDirectChat(otherUser) {
   if (!me || !otherUser?.uid || otherUser.uid === me.uid) throw new Error('A valid other user is required.');
   const chatId = conversationId(me.uid, otherUser.uid);
   const conversationRef = doc(fs, 'conversations', chatId);
-  if (!(await getDoc(conversationRef)).exists()) {
-    await setDoc(conversationRef, { chatId, type: 'direct', name: '', createdBy: me.uid, createdAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp(), lastMessage: '', lastSenderId: '', lastMessageAt: null });
-  }
+  if (!(await getDoc(conversationRef)).exists()) await setDoc(conversationRef, { chatId, type: 'direct', name: '', createdBy: me.uid, createdAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp(), lastMessage: '', lastSenderId: '', lastMessageAt: null });
   const meMember = doc(fs, 'conversations', chatId, 'members', me.uid);
   const otherMember = doc(fs, 'conversations', chatId, 'members', otherUser.uid);
   if (!(await getDoc(meMember)).exists()) await setDoc(meMember, { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
@@ -116,30 +95,19 @@ export function watchMessages(chatId, callback) {
         const otherUid = chatId.startsWith(prefix) ? chatId.slice(prefix.length) : chatId.endsWith(`_${uid}`) ? chatId.slice(0, -(uid.length + 1)) : '';
         if (!otherUid) throw new Error('Conversation could not be identified.');
         let displayName = 'Main user';
-        if (db) {
-          const profile = (await get(ref(db, `publicProfiles/${otherUid}`))).val();
-          displayName = profile?.displayName || displayName;
-        }
+        if (db) displayName = (await get(ref(db, `publicProfiles/${otherUid}`))).val()?.displayName || displayName;
         await ensureDirectChat({ uid: otherUid, displayName });
-      } else if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', auth.currentUser.uid))).exists()) {
-        throw new Error('You are not a member of this conversation.');
-      }
+      } else if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', auth.currentUser.uid))).exists()) throw new Error('You are not a member of this conversation.');
       if (cancelled) return;
       const q = query(collection(fs, 'conversations', chatId, 'messages'), orderBy('createdAt', 'desc'), limit(50));
       unsubscribe = onSnapshot(q, snapshot => callback(normalizeMessages(snapshot)), error => callback([], error));
-    } catch (error) {
-      callback([], error);
-    }
+    } catch (error) { callback([], error); }
   })();
   return () => { cancelled = true; if (unsubscribe) unsubscribe(); };
 }
 
-export function watchPresence(uid, callback) {
-  return onValue(ref(db, `presence/${uid}`), snapshot => callback(snapshot.val() || { online: false }));
-}
-export function watchTyping(chatId, otherUid, callback) {
-  return onValue(ref(db, `typing/${chatId}/${otherUid}`), snapshot => { const value = snapshot.val(); callback(Boolean(value && Date.now() - Number(value) < 3000)); });
-}
+export function watchPresence(uid, callback) { return onValue(ref(db, `presence/${uid}`), snapshot => callback(snapshot.val() || { online: false })); }
+export function watchTyping(chatId, otherUid, callback) { return onValue(ref(db, `typing/${chatId}/${otherUid}`), snapshot => { const value = snapshot.val(); callback(Boolean(value && Date.now() - Number(value) < 3000)); }); }
 
 export async function sendMessage(chatId, text, options = {}) {
   const fs = requireFirestore();
@@ -149,9 +117,53 @@ export async function sendMessage(chatId, text, options = {}) {
   if (!cleanText) return null;
   if (!(await getDoc(doc(fs, 'conversations', chatId, 'members', me.uid))).exists()) throw new Error('You are not a member of this conversation.');
   const messageRef = doc(collection(fs, 'conversations', chatId, 'messages'));
-  await setDoc(messageRef, { senderId: me.uid, type: options.type || 'text', text: cleanText, replyTo: options.replyTo || null, mediaId: options.mediaId || null, createdAt: firestoreServerTimestamp(), deliveredAt: { [me.uid]: firestoreServerTimestamp() }, readBy: { [me.uid]: firestoreServerTimestamp() }, reactions: {}, starredBy: {} });
+  await setDoc(messageRef, { senderId: me.uid, type: options.type || 'text', text: cleanText, replyTo: options.replyTo || null, forwardedFrom: options.forwardedFrom || null, mediaId: options.mediaId || null, createdAt: firestoreServerTimestamp(), deliveredAt: { [me.uid]: firestoreServerTimestamp() }, readBy: { [me.uid]: firestoreServerTimestamp() }, reactions: {}, starredBy: {} });
   await updateDoc(doc(fs, 'conversations', chatId), { lastMessage: cleanText || `[${options.type || 'text'}]`, lastSenderId: me.uid, lastMessageAt: firestoreServerTimestamp(), updatedAt: firestoreServerTimestamp() });
   return messageRef.id;
+}
+
+export async function deleteMessage(chatId, messageId) {
+  const fs = requireFirestore();
+  const uid = auth.currentUser?.uid;
+  if (!uid || !messageId) return;
+  const messageRef = doc(fs, 'conversations', chatId, 'messages', messageId);
+  const snapshot = await getDoc(messageRef);
+  if (!snapshot.exists()) return;
+  if (snapshot.data().senderId !== uid) throw new Error('Only the sender can delete this message.');
+  await deleteDoc(messageRef);
+}
+
+export async function toggleReaction(chatId, messageId, emoji) {
+  const fs = requireFirestore();
+  const uid = auth.currentUser?.uid;
+  if (!uid || !messageId || !emoji) return;
+  const snapshot = await getDoc(doc(fs, 'conversations', chatId, 'messages', messageId));
+  if (!snapshot.exists()) throw new Error('Message no longer exists.');
+  const reactions = { ...(snapshot.data().reactions || {}) };
+  if (reactions[uid] === emoji) delete reactions[uid]; else reactions[uid] = emoji;
+  await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { reactions });
+}
+
+export async function toggleStar(chatId, messageId) {
+  const fs = requireFirestore();
+  const uid = auth.currentUser?.uid;
+  if (!uid || !messageId) return;
+  const snapshot = await getDoc(doc(fs, 'conversations', chatId, 'messages', messageId));
+  if (!snapshot.exists()) throw new Error('Message no longer exists.');
+  const starredBy = { ...(snapshot.data().starredBy || {}) };
+  if (starredBy[uid]) delete starredBy[uid]; else starredBy[uid] = true;
+  await updateDoc(doc(fs, 'conversations', chatId, 'messages', messageId), { starredBy });
+}
+
+export async function forwardMessage(sourceChatId, messageId, targetChatId) {
+  const fs = requireFirestore();
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('You must be signed in.');
+  const source = await getDoc(doc(fs, 'conversations', sourceChatId, 'messages', messageId));
+  if (!source.exists()) throw new Error('Message no longer exists.');
+  if (!(await getDoc(doc(fs, 'conversations', targetChatId, 'members', uid))).exists()) throw new Error('You are not a member of the target conversation.');
+  const data = source.data();
+  return sendMessage(targetChatId, data.text || '', { type: data.type || 'text', mediaId: data.mediaId || null, forwardedFrom: { conversationId: sourceChatId, messageId } });
 }
 
 export async function markDelivered(chatId, messageId, uid = auth.currentUser?.uid) {
@@ -167,11 +179,5 @@ export async function markRead(chatId, messageId) {
   await updateDoc(doc(fs, 'conversations', chatId, 'members', uid), { lastReadMessageId: messageId, lastReadAt: firestoreServerTimestamp() });
   await updateDoc(doc(fs, 'userConversations', uid, 'items', chatId), { unreadCount: 0 });
 }
-export async function markTyping(chatId, typing) {
-  if (!auth.currentUser || !db) return;
-  await set(ref(db, `typing/${chatId}/${auth.currentUser.uid}`), typing ? Date.now() : null);
-}
-export async function updatePresence(online) {
-  if (!auth.currentUser || !db) return;
-  await update(ref(db, `presence/${auth.currentUser.uid}`), { online, lastSeen: Date.now() });
-}
+export async function markTyping(chatId, typing) { if (auth.currentUser && db) await set(ref(db, `typing/${chatId}/${auth.currentUser.uid}`), typing ? Date.now() : null); }
+export async function updatePresence(online) { if (auth.currentUser && db) await update(ref(db, `presence/${auth.currentUser.uid}`), { online, lastSeen: Date.now() }); }

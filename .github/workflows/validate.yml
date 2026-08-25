@@ -16,5 +16,19 @@ jobs:
           node-version: 22
       - name: Check JavaScript syntax
         run: npm run check
+      - name: Check Cloud Functions syntax
+        run: node --check functions/index.js
       - name: Verify production build configuration script
         run: node --check scripts/build-config.mjs
+      - name: Production build
+        env:
+          FIREBASE_API_KEY: CI_PUBLIC_API_KEY
+          FIREBASE_AUTH_DOMAIN: ci.firebaseapp.com
+          FIREBASE_DATABASE_URL: https://ci-default-rtdb.firebaseio.com
+          FIREBASE_PROJECT_ID: ci-project
+          FIREBASE_STORAGE_BUCKET: ci-project.firebasestorage.app
+          FIREBASE_MESSAGING_SENDER_ID: CI_SENDER_ID
+          FIREBASE_APP_ID: CI_APP_ID
+        run: npm run build
+      - name: Validate generated Firebase configuration
+        run: node --check firebase-config.js

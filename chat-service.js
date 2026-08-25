@@ -1,8 +1,29 @@
-import { db, auth, get, onValue, ref, set, update, firestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot, firestoreServerTimestamp } from './firebase.js';
+import { db, auth, get, onValue, ref, set, update, firestore, collection, collectionGroup, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, firestoreServerTimestamp } from './firebase.js';
 const requireFirestore = () => { if (!firestore) throw new Error('Firestore is not configured.'); return firestore; };
 const millis = value => typeof value === 'number' ? value : value?.toMillis ? value.toMillis() : value?.seconds ? value.seconds * 1000 : 0;
 export function conversationId(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
 async function writeConversationIndex(uid, chatId, data) { const fs = requireFirestore(); const indexRef = doc(fs, 'userConversations', uid, 'items', chatId); if ((await getDoc(indexRef)).exists()) return; await setDoc(indexRef, { chatId, ...data, unreadCount: 0, updatedAt: firestoreServerTimestamp() }); }
+async function backfillConversationIndexes(uid) {
+  const fs = requireFirestore();
+  const memberships = await getDocs(query(collectionGroup(fs, 'members'), where('uid', '==', uid), limit(100)));
+  for (const membership of memberships.docs) {
+    const conversationRef = membership.ref.parent.parent;
+    if (!conversationRef) continue;
+    const conversation = await getDoc(conversationRef);
+    if (!conversation.exists()) continue;
+    const data = conversation.data();
+    if (data.type === 'group') {
+      await writeConversationIndex(uid, conversation.id, { type: 'group', groupName: data.name || 'Group', otherName: data.name || 'Group', lastMessage: data.lastMessage || '', lastSenderId: data.lastSenderId || '', lastMessageAt: data.lastMessageAt || null });
+      continue;
+    }
+    const memberSnapshot = await getDocs(collection(fs, 'conversations', conversation.id, 'members'));
+    const other = memberSnapshot.docs.map(item => item.data()).find(member => member.uid !== uid);
+    if (!other?.uid) continue;
+    let otherName = 'Main user';
+    if (db) otherName = (await get(ref(db, `publicProfiles/${other.uid}`))).val()?.displayName || otherName;
+    await writeConversationIndex(uid, conversation.id, { type: 'direct', otherUid: other.uid, otherName, lastMessage: data.lastMessage || '', lastSenderId: data.lastSenderId || '', lastMessageAt: data.lastMessageAt || null });
+  }
+}
 export async function ensureDirectChat(otherUser) {
   const fs = requireFirestore(); const me = auth.currentUser; if (!me || !otherUser?.uid || otherUser.uid === me.uid) throw new Error('A valid other user is required.');
   const chatId = conversationId(me.uid, otherUser.uid); const conversationRef = doc(fs, 'conversations', chatId);
@@ -10,7 +31,6 @@ export async function ensureDirectChat(otherUser) {
   const meMember = doc(fs, 'conversations', chatId, 'members', me.uid); const otherMember = doc(fs, 'conversations', chatId, 'members', otherUser.uid);
   if (!(await getDoc(meMember)).exists()) await setDoc(meMember, { uid: me.uid, role: 'owner', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   if (!(await getDoc(otherMember)).exists()) await setDoc(otherMember, { uid: otherUser.uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
-  // Clients may only create their own conversation index. The server creates the recipient index after a message is sent.
   await writeConversationIndex(me.uid, chatId, { type: 'direct', otherUid: otherUser.uid, otherName: otherUser.displayName || 'Main user' });
   return chatId;
 }
@@ -22,7 +42,7 @@ export async function createGroup(name, members) {
   for (const uid of unique.filter(item => item !== me.uid)) await setDoc(doc(fs, 'conversations', conversationRef.id, 'members', uid), { uid, role: 'member', joinedAt: firestoreServerTimestamp(), lastReadMessageId: '', lastReadAt: null });
   await writeConversationIndex(me.uid, conversationRef.id, { type: 'group', groupName: cleanName, otherName: cleanName }); return conversationRef.id;
 }
-export function watchUserChats(uid, callback) { const fs = requireFirestore(); const q = query(collection(fs, 'userConversations', uid, 'items'), orderBy('updatedAt', 'desc'), limit(50)); return onSnapshot(q, snapshot => { const chats = {}; snapshot.forEach(item => { const data = item.data(); chats[item.id] = { chatId: item.id, ...data, updatedAt: millis(data.updatedAt) }; }); callback(chats); }, error => callback({}, error)); }
+export function watchUserChats(uid, callback) { const fs = requireFirestore(); backfillConversationIndexes(uid).catch(() => {}); const q = query(collection(fs, 'userConversations', uid, 'items'), orderBy('updatedAt', 'desc'), limit(50)); return onSnapshot(q, snapshot => { const chats = {}; snapshot.forEach(item => { const data = item.data(); chats[item.id] = { chatId: item.id, ...data, updatedAt: millis(data.updatedAt) }; }); callback(chats); }, error => callback({}, error)); }
 export function watchChat(chatId, callback) { const fs = requireFirestore(); return onSnapshot(doc(fs, 'conversations', chatId), snapshot => callback(snapshot.exists() ? { chatId: snapshot.id, ...snapshot.data() } : null)); }
 export function watchPublicProfiles(callback) { return onValue(ref(db, 'publicProfiles'), snapshot => callback(snapshot.val() || {})); }
 function normalizeMessages(snapshot) { return snapshot.docs.map(item => { const data = item.data(); return { id: item.id, ...data, createdAt: millis(data.createdAt), deliveredAt: Object.fromEntries(Object.entries(data.deliveredAt || {}).map(([uid, value]) => [uid, millis(value)])), readBy: Object.fromEntries(Object.entries(data.readBy || {}).map(([uid, value]) => [uid, millis(value)])) }; }).reverse(); }
